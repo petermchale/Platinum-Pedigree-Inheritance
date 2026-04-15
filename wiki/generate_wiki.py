@@ -9,8 +9,8 @@ reads as ASCII art but exports as high-DPI vector-friendly PNG suitable for
 Adobe Illustrator.
 
 Run:
-    python pedagogy/visualize_haplotype_method.py --component 1
-    python pedagogy/visualize_haplotype_method.py              # all
+    python wiki/generate_wiki.py --page nuclear_family
+    python wiki/generate_wiki.py                     # all
 
 Source-code cross-references in the panel captions use GitHub permalinks
 pinned to the current HEAD SHA (captured at script start).
@@ -118,6 +118,62 @@ def text_panel(
         fontsize=8, style="italic",
         transform=ax.transAxes,
     )
+
+
+def _render_panel_image(
+    body_lines: List[str],
+    out_path: Path,
+    highlight_spans: List[Tuple[int, int, int, str]] | None = None,
+) -> None:
+    """Render a monospace text block as a standalone panel PNG.
+
+    Unlike `text_panel`, this helper emits no title and no caption — the
+    figure is sized to fit exactly the body lines so it can be embedded
+    inline in a markdown narrative, where the surrounding prose does the
+    explanatory work.
+    """
+    n_lines = max(len(body_lines), 1)
+    fig_w = 12.0
+    fig_h = 0.30 * n_lines + 0.4
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+    fig.subplots_adjust(left=0.02, right=0.98, top=0.96, bottom=0.04)
+    ax.set_axis_off()
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+
+    top = 0.96
+    line_h = 0.92 / n_lines
+    font_size = 12
+
+    for i, line in enumerate(body_lines):
+        y = top - i * line_h
+        ax.text(
+            0.01, y, line,
+            ha="left", va="top",
+            fontsize=font_size, family="monospace",
+            transform=ax.transAxes,
+        )
+
+    if highlight_spans:
+        axes_width_in = fig_w * 0.96
+        char_width_in = (font_size * 0.6) / 72.0
+        char_w = char_width_in / axes_width_in
+        for row, c0, c1, color in highlight_spans:
+            y = top - row * line_h - line_h * 0.9
+            x = 0.01 + c0 * char_w
+            w = (c1 - c0) * char_w
+            ax.add_patch(
+                Rectangle(
+                    (x, y), w, line_h * 0.9,
+                    transform=ax.transAxes,
+                    facecolor=color, edgecolor="none",
+                    alpha=0.35, zorder=0,
+                )
+            )
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, dpi=200)
+    plt.close(fig)
 
 
 # ---------------------------------------------------------------------------
@@ -282,12 +338,18 @@ def _mom_label_for_kid_at_site(sim: Dict, kid: str, site: int) -> str:
     return "D" if carrier_label == "C" else "C"
 
 
-def component_1_nuclear_family(out_path: Path) -> None:
+def component_1_nuclear_family(out_dir: Path) -> None:
+    """Render the nuclear-family component as a dedicated wiki page.
+
+    Panels and prose are written to `out_dir/nuclear_family/`; the
+    top-level wiki index at `out_dir/index.md` references the resulting
+    `nuclear_family.md` via a stable subdirectory name (no numeric
+    prefix — reading order lives in the index, not in filenames).
+    """
     sim = _build_simulation()
     dad_info = _informative_sites_dad(sim)
     mom_info = _informative_sites_mom(sim)
 
-    # Deduce paternal labels across informative sites, per kid.
     kids = ["Kid1", "Kid2", "Kid3"]
     paternal_deduced: Dict[str, List[str]] = {k: ["?"] * NUM_SITES for k in kids}
     maternal_deduced: Dict[str, List[str]] = {k: ["?"] * NUM_SITES for k in kids}
@@ -298,8 +360,6 @@ def component_1_nuclear_family(out_path: Path) -> None:
         for k in kids:
             maternal_deduced[k][s] = _mom_label_for_kid_at_site(sim, k, s)
 
-    # Fill '?' via block-merge intuition: carry the last known label forward.
-    # Mirrors collapse_identical_iht's effect of producing contiguous blocks.
     def carry_forward(labels: List[str]) -> List[str]:
         out = list(labels)
         last = "?"
@@ -308,7 +368,6 @@ def component_1_nuclear_family(out_path: Path) -> None:
                 last = out[i]
             else:
                 out[i] = last
-        # Backward fill for leading '?'s.
         last = "?"
         for i in range(NUM_SITES - 1, -1, -1):
             if out[i] != "?":
@@ -320,20 +379,13 @@ def component_1_nuclear_family(out_path: Path) -> None:
     paternal_blocks = {k: carry_forward(paternal_deduced[k]) for k in kids}
     maternal_blocks = {k: carry_forward(maternal_deduced[k]) for k in kids}
 
-    # ------------------------------------------------------------------
-    # Figure layout: 3 rows × 2 cols = 6 panels.
-    # ------------------------------------------------------------------
-    fig, axes = plt.subplots(3, 2, figsize=(16, 14))
-    plt.subplots_adjust(
-        left=0.03, right=0.985, top=0.96, bottom=0.03,
-        wspace=0.08, hspace=0.35,
-    )
+    nf_dir = out_dir / "nuclear_family"
+    nf_dir.mkdir(parents=True, exist_ok=True)
 
-    site_header = "site:  " + " ".join(f"{i:>1}" for i in range(NUM_SITES))
-
-    # --------- Panel A: true haplotypes ---------
+    # ------------------------------------------------------------------
+    # Panel A — ground-truth founder haplotypes (no title, no site row).
+    # ------------------------------------------------------------------
     body_a = [
-        site_header,
         "Dad A:  " + " ".join(str(x) for x in sim["dad_a"]),
         "Dad B:  " + " ".join(str(x) for x in sim["dad_b"]),
         "Mom C:  " + " ".join(str(x) for x in sim["mom_c"]),
@@ -344,195 +396,114 @@ def component_1_nuclear_family(out_path: Path) -> None:
         "  Kid2 <- (B,D)       paternal = B, maternal = D  (no recomb)",
         "  Kid3 <- (A|B,C)     paternal recomb: A at sites 0-5, B at 6-11",
     ]
-    cap_a = (
-        "Panel A. Ground-truth founder haplotypes. Dad carries two haplotypes "
-        "labelled A and B; mom carries C and D. Founder letters are assigned "
-        "by Iht::new (iht.rs:172). Each child receives one paternal and one "
-        "maternal haplotype; Kid3 is a paternal recombinant (crossover after "
-        "site 5). These letters are the target of the structural haplotype "
-        "map — NOT the 0/1 allele strings themselves."
-    )
-    text_panel(axes[0, 0], "A. Ground truth founder haplotypes", body_a, cap_a)
+    _render_panel_image(body_a, nf_dir / "panel_a.png")
 
-    # --------- Panel B: unphased VCF ---------
+    # ------------------------------------------------------------------
+    # Panel B — unphased VCF view (no title, no site row).
+    # ------------------------------------------------------------------
+    def _fmt_gt(g: str) -> str:
+        return g[0] + g[2] if g[0] == g[2] else "01"
+
     body_b = [
-        site_header,
-        "Dad :   " + " ".join(g[0] + g[2] if g[0] == g[2] else "01" for g in sim["dad_unphased"]),
-        "Mom :   " + " ".join(g[0] + g[2] if g[0] == g[2] else "01" for g in sim["mom_unphased"]),
-        "Kid1:   " + " ".join(g[0] + g[2] if g[0] == g[2] else "01" for g in sim["kid1_unphased"]),
-        "Kid2:   " + " ".join(g[0] + g[2] if g[0] == g[2] else "01" for g in sim["kid2_unphased"]),
-        "Kid3:   " + " ".join(g[0] + g[2] if g[0] == g[2] else "01" for g in sim["kid3_unphased"]),
+        "Dad :   " + " ".join(_fmt_gt(g) for g in sim["dad_unphased"]),
+        "Mom :   " + " ".join(_fmt_gt(g) for g in sim["mom_unphased"]),
+        "Kid1:   " + " ".join(_fmt_gt(g) for g in sim["kid1_unphased"]),
+        "Kid2:   " + " ".join(_fmt_gt(g) for g in sim["kid2_unphased"]),
+        "Kid3:   " + " ".join(_fmt_gt(g) for g in sim["kid3_unphased"]),
         "",
-        "(0/0 shown as '00', 0/1 as '01', 1/1 as '11' - one column per site)",
+        "(0/0 rendered as '00', 0/1 as '01', 1/1 as '11')",
     ]
-    cap_b = (
-        "Panel B. Unphased genotypes as they appear in a jointly called VCF. "
-        "This is the only input gtg-ped-map sees (plus the PED file). "
-        "Notice that neither parent's homologs can be distinguished from the "
-        "genotypes alone — the structural labels A/B/C/D must be inferred "
-        "from patterns across the family."
-    )
-    text_panel(axes[0, 1], "B. Unphased VCF view (gtg-ped-map input)", body_b, cap_b)
+    _render_panel_image(body_b, nf_dir / "panel_b.png")
 
-    # --------- Panel C: dad-informative sites ---------
+    # ------------------------------------------------------------------
+    # Panel C — merged paternal + maternal informative-site deduction.
+    # Rows are explicitly labelled "Kid<n> p" / "Kid<n> m".
+    # ------------------------------------------------------------------
     def mark_sites(site_list: List[int]) -> str:
         marks = ["_"] * NUM_SITES
         for s in site_list:
             marks[s] = "*"
-        return "        " + " ".join(marks)
+        return "           " + " ".join(marks)
 
     body_c = [
-        site_header,
-        mark_sites(dad_info) + "   <- dad-informative sites (*)",
+        mark_sites(dad_info) + "   <- dad-informative (dad het x mom hom)",
+        mark_sites(mom_info) + "   <- mom-informative (mom het x dad hom)",
         "",
-        "At each *, dad is het (0/1) and mom is homozygous: the allele",
-        "unique to dad tags the kid's paternal slot with A or B.",
+        "Deduced founder-letter labels at informative sites only",
+        "('.' = site not informative for that slot):",
         "",
-        "Deduced paternal labels (at informative sites only):",
     ]
     for k in kids:
-        row = "  " + k + ":   "
-        row += " ".join(
+        pat_row = f"  {k} p:    " + " ".join(
             paternal_deduced[k][i] if i in dad_info else "."
             for i in range(NUM_SITES)
         )
-        body_c.append(row)
-    cap_c = (
-        "Panel C. Dad-informative sites (dad het × mom hom). "
-        "unique_allele (map_builder.rs:243) isolates dad's unique allele at "
-        "each such site; track_alleles_through_pedigree (map_builder.rs:295) "
-        "then tags each child's paternal slot with A or B depending on "
-        "whether the child inherited that unique allele. Dots mark "
-        "non-informative sites where dad's contribution cannot yet be "
-        "labelled."
-    )
-    text_panel(axes[1, 0], "C. Paternal-haplotype deduction (A vs B)", body_c, cap_c)
-
-    # --------- Panel D: mom-informative sites ---------
-    body_d = [
-        site_header,
-        mark_sites(mom_info) + "   <- mom-informative sites (*)",
-        "",
-        "Symmetric logic: at each *, mom is het and dad is homozygous.",
-        "The mom-unique allele labels the kid's maternal slot C or D.",
-        "",
-        "Deduced maternal labels (at informative sites only):",
-    ]
-    for k in kids:
-        row = "  " + k + ":   "
-        row += " ".join(
+        mat_row = f"  {k} m:    " + " ".join(
             maternal_deduced[k][i] if i in mom_info else "."
             for i in range(NUM_SITES)
         )
-        body_d.append(row)
-    cap_d = (
-        "Panel D. Mom-informative sites, symmetric to Panel C. The union of "
-        "paternal and maternal informative sites is what the Rust code calls "
-        "the marker set; short runs of masked markers are later dropped by "
-        "count_matching_neighbors / mask_child_alleles "
-        "(map_builder.rs:935, 970) to reduce sequencing-error noise."
-    )
-    text_panel(axes[1, 1], "D. Maternal-haplotype deduction (C vs D)", body_d, cap_d)
+        body_c.append(pat_row)
+        body_c.append(mat_row)
+    _render_panel_image(body_c, nf_dir / "panel_c.png")
 
-    # --------- Panel E: merged block map with recombination ---------
-    body_e = [
-        site_header,
-        "",
-        "Deduced (paternal | maternal) after block-fill:",
-    ]
-    highlight_spans: List[Tuple[int, int, int, str]] = []
+    # ------------------------------------------------------------------
+    # Panel D — collapsed blocks with paternal / maternal on separate
+    # rows, highlighting Kid3's A -> B transition.
+    # ------------------------------------------------------------------
+    body_d = ["Deduced labels after block collapse and gap-fill:", ""]
     for k in kids:
-        row = "  " + k + ":   "
-        pieces = []
-        for i in range(NUM_SITES):
-            pieces.append(paternal_blocks[k][i] + maternal_blocks[k][i])
-        row += " ".join(pieces)
-        body_e.append(row)
-
-    body_e += [
-        "",
-        "A switch in paternal label within a kid (e.g. A -> B in Kid3)",
-        "is written to {prefix}.recombinants.txt as a putative crossover.",
-    ]
-
-    # Highlight Kid3's switch point at site 5->6.
-    kid3_row = 4  # body_e index of Kid3 row (after the 'Deduced...' header)
-    # Locate the character column of Kid3's site-5 and site-6 labels.
-    prefix_len = len("  Kid3:   ")
-    col_site5 = prefix_len + 5 * 3  # each site is 2 chars + 1 space
-    col_site6 = prefix_len + 6 * 3
-    highlight_spans.append((kid3_row, col_site5, col_site5 + 2, "#ffcc66"))
-    highlight_spans.append((kid3_row, col_site6, col_site6 + 2, "#ff9966"))
-
-    cap_e = (
-        "Panel E. Per-kid haplotype label map after block collapse "
-        "(collapse_identical_iht, map_builder.rs:385). Adjacent informative "
-        "sites with identical letter assignments are merged into blocks; "
-        "short '?' gaps are filled from flanking labels "
-        "(fill_missing_values_by_neighbor, map_builder.rs:540). Kid3's "
-        "A→B switch (highlighted) is emitted to {prefix}.recombinants.txt "
-        "by summarize_child_changes (map_builder.rs:673)."
-    )
-    text_panel(
-        axes[2, 0],
-        "E. Collapsed blocks + recombination detection",
-        body_e, cap_e,
-        highlight_spans=highlight_spans,
-    )
-
-    # --------- Panel F: truth vs deduced + key caveat ---------
-    body_f = [
-        "Truth vs deduced labels (per kid, per site):",
-        site_header,
-    ]
-    for k in kids:
-        truth_row = "  " + k + "T:  " + " ".join(a + b for a, b in sim["kid_labels"][k])
-        dedu_row = "  " + k + "D:  " + " ".join(
-            paternal_blocks[k][i] + maternal_blocks[k][i] for i in range(NUM_SITES)
+        pat_row = f"  {k} p:    " + " ".join(
+            paternal_blocks[k][i] for i in range(NUM_SITES)
         )
-        body_f.append(truth_row)
-        body_f.append(dedu_row)
+        mat_row = f"  {k} m:    " + " ".join(
+            maternal_blocks[k][i] for i in range(NUM_SITES)
+        )
+        body_d.append(pat_row)
+        body_d.append(mat_row)
+    body_d += [
+        "",
+        "Kid3's paternal row switches A -> B between sites 5 and 6;",
+        "this transition is written to {prefix}.recombinants.txt.",
+    ]
+    _render_panel_image(body_d, nf_dir / "panel_d.png")
+
+    # ------------------------------------------------------------------
+    # Panel E — truth vs deduced, paternal and maternal on separate rows.
+    # ------------------------------------------------------------------
+    body_e = ["Truth (T) vs deduced (D) founder-letter labels:", ""]
     mismatches = 0
     for k in kids:
+        truth = sim["kid_labels"][k]
+        pat_truth = [truth[i][0] for i in range(NUM_SITES)]
+        mat_truth = [truth[i][1] for i in range(NUM_SITES)]
+        pat_dedu = [paternal_blocks[k][i] for i in range(NUM_SITES)]
+        mat_dedu = [maternal_blocks[k][i] for i in range(NUM_SITES)]
+        body_e.append(f"  {k} p  T:  " + " ".join(pat_truth))
+        body_e.append(f"  {k} p  D:  " + " ".join(pat_dedu))
+        body_e.append(f"  {k} m  T:  " + " ".join(mat_truth))
+        body_e.append(f"  {k} m  D:  " + " ".join(mat_dedu))
+        body_e.append("")
         for i in range(NUM_SITES):
-            truth = sim["kid_labels"][k][i]
-            dedu = (paternal_blocks[k][i], maternal_blocks[k][i])
-            if truth != dedu:
+            if pat_truth[i] != pat_dedu[i]:
                 mismatches += 1
-    body_f += [
-        "",
-        f"Total label mismatches: {mismatches} / {NUM_SITES * len(kids)}",
-        "",
-        "KEY POINT: the inheritance map stores only letters (A,B,C,D),",
-        "NOT the 0/1 allele sequences. Reconstructing which allele each",
-        "letter represents at every VCF site is Component 3's job",
-        "(gtg-concordance, gtg_concordance.rs:252 find_best_phase_orientation).",
-    ]
-    cap_f = (
-        "Panel F. Deduced structural labels match the ground truth for all "
-        "three kids, including Kid3's recombination. Critically, "
-        "gtg-ped-map never writes a 0/1 allele sequence for any haplotype — "
-        "it only writes founder letters. The mapping from founder letter to "
-        "allele (0 or 1) at each site is performed at concordance time by "
-        "assign_genotypes (iht.rs:442), which is the subject of Component 3."
-    )
-    text_panel(
-        axes[2, 1], "F. Truth vs deduced + boundary with gtg-concordance",
-        body_f, cap_f,
+            if mat_truth[i] != mat_dedu[i]:
+                mismatches += 1
+    total_slots = NUM_SITES * len(kids) * 2
+    body_e.append(f"Total label mismatches: {mismatches} / {total_slots}")
+    _render_panel_image(body_e, nf_dir / "panel_e.png")
+
+    # ------------------------------------------------------------------
+    # Markdown narrative.
+    # ------------------------------------------------------------------
+    _emit_component1_markdown(
+        nf_dir / "nuclear_family.md",
+        dad_info=dad_info,
+        mom_info=mom_info,
+        mismatches=mismatches,
+        total_slots=total_slots,
     )
 
-    fig.suptitle(
-        "Component 1 — Structural haplotype mapping in a nuclear family "
-        "(gtg-ped-map)",
-        fontsize=13, fontweight="bold",
-    )
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=200)
-    plt.close(fig)
-
-    # --- Stdout summary for the user / Component-1 verification ---
-    print(f"[component 1] Wrote {out_path}")
+    print(f"[component 1] Wrote panel PNGs + markdown to {nf_dir}")
     print(f"[component 1] Dad-informative sites: {dad_info}")
     print(f"[component 1] Mom-informative sites: {mom_info}")
     print(f"[component 1] Label mismatches vs truth: {mismatches}")
@@ -540,6 +511,180 @@ def component_1_nuclear_family(out_path: Path) -> None:
         f"[component 1] Permalink example: "
         f"{permalink('code/rust/src/bin/map_builder.rs', 295, SHA)}"
     )
+
+
+def _emit_component1_markdown(
+    out_path: Path,
+    *,
+    dad_info: List[int],
+    mom_info: List[int],
+    mismatches: int,
+    total_slots: int,
+) -> None:
+    """Write the Component-1 narrative that interleaves panel PNGs with
+    prose explanations and Rust-source permalinks.
+    """
+    def link(path: str, line: int) -> str:
+        return permalink(path, line, SHA)
+
+    map_rs = "code/rust/src/bin/map_builder.rs"
+    iht_rs = "code/rust/src/iht.rs"
+
+    content = f"""\
+# Structural haplotype mapping in a nuclear family
+
+This page is part of the [wiki](../index.md) and walks through
+`gtg-ped-map`'s structural labelling algorithm on the simplest possible
+pedigree: a two-generation nuclear family with two founders (dad and
+mom) and three children. It complements the full
+[`methods.md`](../methods.md) write-up by zooming in on the per-site
+mechanics and pinning each panel to the exact Rust code that implements
+it. All line numbers refer to commit `{SHA[:7]}`.
+
+The toy simulation hard-codes four founder haplotypes over
+{NUM_SITES} sites and three children whose transmissions are known a
+priori. Everything below is reproducible by running
+
+```
+python wiki/generate_wiki.py --page nuclear_family
+```
+
+which regenerates both the panel PNGs referenced here and this markdown
+file itself.
+
+## 1. Ground truth
+
+![Panel A — Ground-truth founder haplotypes](panel_a.png)
+
+Dad carries two haplotypes, arbitrarily labelled **A** and **B**; mom
+carries **C** and **D**. These letter labels are assigned at startup by
+[`Iht::new`]({link(iht_rs, 172)}), which hands each founder a fresh
+pair of capital letters — `(A,B)`, `(C,D)`, `(E,F)`, … — *without*
+associating any allele sequence with them. The letters are pure
+structural placeholders whose only job is to be carried from founders
+to descendants.
+
+In this simulation:
+
+- **Kid1** inherits `(A, C)` with no recombination.
+- **Kid2** inherits `(B, D)` with no recombination.
+- **Kid3** inherits `(A|B, C)` — the paternal slot crosses over between
+  sites 5 and 6, so Kid3 carries dad's `A` haplotype on sites 0–5 and
+  dad's `B` haplotype on sites 6–11.
+
+The goal of `gtg-ped-map` is to recover exactly these letter
+transmissions from the jointly-called VCF alone, without ever looking
+at the underlying 0/1 allele sequence.
+
+## 2. Unphased VCF input
+
+![Panel B — Unphased VCF view](panel_b.png)
+
+This is the only genotype information `gtg-ped-map` sees (plus the PED
+file that declares who is whose parent). Two observations matter:
+
+- **Haplotypes cannot be distinguished from genotypes alone.** A `0/1`
+  call for dad does not reveal which of his two homologs carries the
+  `1`, so a single-individual view has no way to label `A` vs `B`.
+- **Patterns across the family resolve the ambiguity.** If dad is `0/1`
+  while mom is `0/0`, then any child that also carries a `1` must have
+  inherited dad's `1`-carrying homolog — precisely the logic of the
+  informative-site test in the next section.
+
+Only biallelic SNVs enter the map; indels are filtered at read time via
+[`is_indel`]({link(map_rs, 501)}).
+
+## 3. Informative-site detection and letter deduction
+
+![Panel C — Informative-site deduction (paternal and maternal)](panel_c.png)
+
+For each VCF record,
+[`track_alleles_through_pedigree`]({link(map_rs, 295)}) walks the
+pedigree in ancestor-first depth order and, for every `(parent, spouse)`
+pair, calls [`unique_allele`]({link(map_rs, 243)}) to ask whether the
+parent carries an allele that the spouse does not. Two cases can arise:
+
+- **Dad-informative** (dad het × mom hom): dad's unique allele tags
+  whichever paternal homolog (`A` or `B`) each child inherited. In
+  this simulation these are sites `{dad_info}`.
+- **Mom-informative** (mom het × dad hom): symmetric, tagging `C` or
+  `D`. These are sites `{mom_info}`.
+
+When a child carries the parent's unique allele, the child's paternal
+(or maternal) slot is filled with the parent's letter; otherwise the
+slot is filled with the *other* letter of that parent's pair. Because
+the depth-ordered walk always processes a parent before its children,
+[`get_iht_markers`]({link(map_rs, 274)}) reads the parent's already-
+assigned letters when propagating to the next generation, which is
+what makes the method look "recursive" across generations while being
+expressed as a single loop.
+
+Non-informative sites (both parents het, or both hom for the same
+allele) contribute nothing at this stage and are rendered as `.` in the
+panel. Each kid's paternal row (`p`) sits directly above its maternal
+row (`m`), so the two deduction streams line up site-by-site. Kid3's
+`p` row already exhibits the A→B recombination at sites 5/6, even
+though no block collapse has happened yet.
+
+## 4. Block collapse and noise filtering
+
+![Panel D — Collapsed blocks with recombination](panel_d.png)
+
+Several Rust routines clean the per-site letter trace up before it is
+written to disk:
+
+1. [`backfill_sibs`]({link(map_rs, 804)}) uses the fact that siblings
+   must together carry both founder homologs. If exactly one child is
+   tagged at a site, the others can be inferred by elimination. In this
+   toy simulation every informative site already tags all three kids,
+   so backfill is a no-op here, but on real data it is essential in
+   noisy regions.
+2. [`collapse_identical_iht`]({link(map_rs, 385)}) merges adjacent
+   sites with compatible letter assignments into blocks, while
+   [`fill_missing_values`]({link(map_rs, 617)}) and
+   [`fill_missing_values_by_neighbor`]({link(map_rs, 540)}) fill the
+   `.` gaps visible in Panel C from flanking blocks.
+3. [`count_matching_neighbors`]({link(map_rs, 935)}) and
+   [`mask_child_alleles`]({link(map_rs, 970)}) identify isolated runs
+   shorter than `--run` (default 10 markers) and mask them back to `?`
+   as likely sequencing noise, so that collapse does not invent
+   spurious recombinations.
+4. [`perform_flips_in_place`]({link(map_rs, 702)}) enforces consistent
+   founder-letter orientation across blocks, since the two letters in a
+   founder's pair are interchangeable within any single block.
+
+After these steps, each kid's paternal and maternal slots are fully
+resolved — shown on separate rows per kid in the panel above. Kid3's
+highlighted A→B transition on the paternal row is emitted to
+`{{prefix}}.recombinants.txt` by
+[`summarize_child_changes`]({link(map_rs, 673)}).
+
+## 5. Truth versus deduced
+
+![Panel E — Truth vs deduced founder labels](panel_e.png)
+
+For every kid the deduced paternal and maternal label streams match the
+ground truth at every site ({mismatches} mismatches out of
+{total_slots} label slots), including Kid3's recombination. The full
+output of `gtg-ped-map` for this chromosome is the set of blocks shown
+above plus the `recombinants.txt` entry for Kid3's switch — and
+critically, **nothing else**. The block map stores only founder
+letters; it does *not* store the 0/1 allele sequence of any haplotype.
+
+Reconstructing which allele each letter represents at every VCF site
+is the job of `gtg-concordance`, which will have its own wiki page
+once migrated. For every block, `gtg-concordance` enumerates the
+`2^F` founder-phase orientations produced by
+[`Iht::founder_phase_orientations`]({link(iht_rs, 492)}), maps letters
+to VCF alleles via [`assign_genotypes`]({link(iht_rs, 442)}), and picks
+the orientation that minimises mismatches against the observed
+genotypes. The split of responsibilities is deliberate and strict:
+`gtg-ped-map` writes only letters and only at informative sites, while
+`gtg-concordance` is the sole place where letter→allele correspondence
+is computed and written out.
+"""
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(content)
 
 
 # ---------------------------------------------------------------------------
@@ -1589,13 +1734,13 @@ hemizygous slot.
 ## 5. Reproducing the toy figures
 
 The three multi-panel figures in this manuscript were produced by
-`pedagogy/visualize_haplotype_method.py`, which contains fully
+`wiki/generate_wiki.py`, which contains fully
 deterministic, hard-coded simulations of the method on (a) a nuclear
 family with one paternal recombinant child, (b) a three-generation
 pedigree with an outside marriage, and (c) non-informative site phasing
 with an injected sequencing error. Running the script with no arguments
 regenerates all three PNGs and this Methods document alongside it in
-`pedagogy/`.
+`wiki/`.
 """
 
 
@@ -1635,43 +1780,121 @@ def emit_methods_section(out_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Wiki index (LLM-wiki style catalog, Karpathy pattern)
+# ---------------------------------------------------------------------------
+#
+# The wiki's top-level `index.md` is a thin catalog: one entry per page with
+# a one-line summary, grouped by category, and a recommended reading order.
+# Reading order lives here rather than in filenames — subdirectory names are
+# descriptive ("nuclear_family") rather than numeric, so adding or reordering
+# pages does not rename files.
+
+def emit_wiki_index(out_path: Path) -> None:
+    content = """\
+# Platinum Pedigree Inheritance — wiki
+
+This wiki accompanies the `gtg-ped-map` and `gtg-concordance` Rust
+binaries in this repository. It is organised as a small catalog of
+self-contained pages that walk through the pipeline in increasing
+order of complexity, plus a full Methods write-up for the manuscript.
+
+The structure is inspired by Andrej Karpathy's "LLM Wiki" pattern —
+see his [tweet](https://x.com/karpathy/status/2040572272944324650) and
+accompanying [gist](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
+— in which a repository ships a thin, hand-curated catalog page that
+links out to self-contained topic pages, each bundled with its own
+assets and regenerable from source. Here the "source" is the following Python
+script plus the pinned Rust commit:
+[`wiki/generate_wiki.py`](generate_wiki.py).
+
+Every page that references Rust source uses a permalink pinned to the
+commit SHA captured when the wiki was last regenerated. The whole wiki
+is reproducible by running
+
+```
+python wiki/generate_wiki.py
+```
+
+## Walkthrough pages (recommended reading order)
+
+1. [Nuclear family — structural haplotype mapping](nuclear_family/nuclear_family.md)
+   — the simplest case: two founders and three children, one paternal
+   recombinant. Introduces founder-letter labelling, informative-site
+   detection, block collapse, and recombination reporting.
+2. *(coming soon)* **Three-generation pedigree with an outside
+   marriage** — shows how the same routine recurses across generations
+   via ancestor-first depth ordering, without ever constructing a
+   joint inheritance vector over all founders.
+3. *(coming soon)* **gtg-concordance phasing at non-informative
+   sites** — closes the pipeline by mapping founder letters back to
+   VCF alleles, with the "impossible genotype" rule that routes
+   sequencing errors to `fail.vcf`.
+
+## Reference pages
+
+- [Methods](methods.md) — the manuscript-style write-up with the
+  real-world caveats (depth filtering, phase instability, sibship
+  backfilling, chromosome X) that the walkthrough pages deliberately
+  skip.
+
+## Conventions
+
+- **Filenames describe content, not sequence.** Reading order is
+  defined above; subdirectories use short descriptive names
+  (`nuclear_family/`) instead of numeric prefixes.
+- **Panels live next to the page that references them.** Each
+  walkthrough subdirectory holds the markdown plus its PNG panels, so
+  a page is self-contained and can be moved or renamed as a unit.
+- **Rust permalinks are pinned to a commit SHA.** Regenerating the
+  wiki refreshes every permalink to the current `HEAD`.
+"""
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(content)
+    print(f"[wiki] Wrote {out_path}")
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
+PAGE_CHOICES = ["nuclear_family", "three_generations", "concordance", "methods"]
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--component", type=int, choices=[1, 2, 3, 4],
-        help="Render only one component (default: all).",
+        "--page", choices=PAGE_CHOICES,
+        help="Render only one wiki page (default: all).",
     )
     parser.add_argument(
         "--outdir", type=Path, default=FIG_DIR,
-        help="Directory to write PNGs into.",
+        help="Directory to write the wiki into.",
     )
     args = parser.parse_args()
 
     args.outdir.mkdir(parents=True, exist_ok=True)
 
-    components = {
-        1: lambda: component_1_nuclear_family(
-            args.outdir / "component1_nuclear_family.png"
-        ),
-        2: lambda: component_2_three_generations(
+    pages = {
+        "nuclear_family": lambda: component_1_nuclear_family(args.outdir),
+        "three_generations": lambda: component_2_three_generations(
             args.outdir / "component2_three_generations.png"
         ),
-        3: lambda: component_3_concordance(
+        "concordance": lambda: component_3_concordance(
             args.outdir / "component3_concordance.png"
         ),
-        4: lambda: emit_methods_section(
+        "methods": lambda: emit_methods_section(
             args.outdir / "methods.md"
         ),
     }
 
-    if args.component:
-        components[args.component]()
+    if args.page:
+        pages[args.page]()
     else:
-        for fn in components.values():
+        for fn in pages.values():
             fn()
+
+    # The wiki index is the catalog, so it is always refreshed.
+    emit_wiki_index(args.outdir / "index.md")
 
 
 if __name__ == "__main__":
