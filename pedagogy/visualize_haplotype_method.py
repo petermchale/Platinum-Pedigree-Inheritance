@@ -52,7 +52,7 @@ SHA = head_sha()
 # ---------------------------------------------------------------------------
 
 def text_panel(
-    ax: plt.Axes,
+    ax: plt.Axes, # type: ignore
     title: str,
     body_lines: List[str],
     caption: str,
