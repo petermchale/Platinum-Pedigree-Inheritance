@@ -529,6 +529,7 @@ def _emit_component1_markdown(
 
     map_rs = "code/rust/src/bin/map_builder.rs"
     iht_rs = "code/rust/src/iht.rs"
+    concord_rs = "code/rust/src/bin/gtg_concordance.rs"
 
     content = f"""\
 # Structural haplotype mapping in a nuclear family
@@ -539,7 +540,12 @@ pedigree: a two-generation nuclear family with two founders (dad and
 mom) and three children. It complements the full
 [`methods.md`](../methods.md) write-up by zooming in on the per-site
 mechanics and pinning each panel to the exact Rust code that implements
-it. All line numbers refer to commit `{SHA[:7]}`.
+it. All line numbers refer to commit `{SHA[:7]}`. Each function link is
+followed by its call site in the driver — `main()` in
+[`map_builder.rs`]({link(map_rs, 989)}) for `gtg-ped-map`, and `main()` in
+[`gtg_concordance.rs`]({link(concord_rs, 315)}) for `gtg-concordance` —
+so you can step through the driver source in parallel with this
+walkthrough.
 
 The toy simulation hard-codes four founder haplotypes over
 {NUM_SITES} sites and three children whose transmissions are known a
@@ -558,11 +564,13 @@ file itself.
 
 Dad carries two haplotypes, arbitrarily labelled **A** and **B**; mom
 carries **C** and **D**. These letter labels are assigned at startup by
-[`Iht::new`]({link(iht_rs, 172)}), which hands each founder a fresh
-pair of capital letters — `(A,B)`, `(C,D)`, `(E,F)`, … — *without*
-associating any allele sequence with them. The letters are pure
-structural placeholders whose only job is to be carried from founders
-to descendants.
+[`Iht::new`]({link(iht_rs, 172)}) (driver calls at
+[`map_builder.rs:1059`]({link(map_rs, 1059)}) for the master template
+and [`map_builder.rs:1111`]({link(map_rs, 1111)}) for each VCF site),
+which hands each founder a fresh pair of capital letters — `(A,B)`,
+`(C,D)`, `(E,F)`, … — *without* associating any allele sequence with
+them. The letters are pure structural placeholders whose only job is
+to be carried from founders to descendants.
 
 In this simulation:
 
@@ -592,17 +600,21 @@ file that declares who is whose parent). Two observations matter:
   informative-site test in the next section.
 
 Only biallelic SNVs enter the map; indels are filtered at read time via
-[`is_indel`]({link(map_rs, 501)}).
+[`is_indel`]({link(map_rs, 501)}), invoked from the VCF-reading loop at
+[`map_builder.rs:164`]({link(map_rs, 164)}) inside `parse_vcf` (the
+driver calls `parse_vcf` at [`map_builder.rs:1092`]({link(map_rs, 1092)})).
 
 ## 3. Informative-site detection and letter deduction
 
 ![Panel C — Informative-site deduction (paternal and maternal)](panel_c.png)
 
 For each VCF record,
-[`track_alleles_through_pedigree`]({link(map_rs, 295)}) walks the
-pedigree in ancestor-first depth order and, for every `(parent, spouse)`
-pair, calls [`unique_allele`]({link(map_rs, 243)}) to ask whether the
-parent carries an allele that the spouse does not. Two cases can arise:
+[`track_alleles_through_pedigree`]({link(map_rs, 295)}) (driver call at
+[`map_builder.rs:1116`]({link(map_rs, 1116)})) walks the pedigree in
+ancestor-first depth order and, for every `(parent, spouse)` pair,
+calls [`unique_allele`]({link(map_rs, 243)}) (from inside the walk at
+[`map_builder.rs:315`]({link(map_rs, 315)})) to ask whether the parent
+carries an allele that the spouse does not. Two cases can arise:
 
 - **Dad-informative** (dad het × mom hom): dad's unique allele tags
   whichever paternal homolog (`A` or `B`) each child inherited. In
@@ -614,10 +626,11 @@ When a child carries the parent's unique allele, the child's paternal
 (or maternal) slot is filled with the parent's letter; otherwise the
 slot is filled with the *other* letter of that parent's pair. Because
 the depth-ordered walk always processes a parent before its children,
-[`get_iht_markers`]({link(map_rs, 274)}) reads the parent's already-
-assigned letters when propagating to the next generation, which is
-what makes the method look "recursive" across generations while being
-expressed as a single loop.
+[`get_iht_markers`]({link(map_rs, 274)}) (called from inside the walk
+at [`map_builder.rs:328`]({link(map_rs, 328)})) reads the parent's
+already-assigned letters when propagating to the next generation,
+which is what makes the method look "recursive" across generations
+while being expressed as a single loop.
 
 Non-informative sites (both parents het, or both hom for the same
 allele) contribute nothing at this stage and are rendered as `.` in the
@@ -633,31 +646,43 @@ though no block collapse has happened yet.
 Several Rust routines clean the per-site letter trace up before it is
 written to disk:
 
-1. [`backfill_sibs`]({link(map_rs, 804)}) uses the fact that siblings
-   must together carry both founder homologs. If exactly one child is
-   tagged at a site, the others can be inferred by elimination. In this
-   toy simulation every informative site already tags all three kids,
-   so backfill is a no-op here, but on real data it is essential in
-   noisy regions.
-2. [`collapse_identical_iht`]({link(map_rs, 385)}) merges adjacent
-   sites with compatible letter assignments into blocks, while
-   [`fill_missing_values`]({link(map_rs, 617)}) and
-   [`fill_missing_values_by_neighbor`]({link(map_rs, 540)}) fill the
-   `.` gaps visible in Panel C from flanking blocks.
-3. [`count_matching_neighbors`]({link(map_rs, 935)}) and
-   [`mask_child_alleles`]({link(map_rs, 970)}) identify isolated runs
-   shorter than `--run` (default 10 markers) and mask them back to `?`
-   as likely sequencing noise, so that collapse does not invent
+1. [`backfill_sibs`]({link(map_rs, 804)}) (driver call at
+   [`map_builder.rs:1122`]({link(map_rs, 1122)})) uses the fact that
+   siblings must together carry both founder homologs. If exactly one
+   child is tagged at a site, the others can be inferred by elimination.
+   In this toy simulation every informative site already tags all three
+   kids, so backfill is a no-op here, but on real data it is essential
+   in noisy regions.
+2. [`collapse_identical_iht`]({link(map_rs, 385)}) (driver call at
+   [`map_builder.rs:1191`]({link(map_rs, 1191)})) merges adjacent sites
+   with compatible letter assignments into blocks, while
+   [`fill_missing_values`]({link(map_rs, 617)}) (driver call at
+   [`map_builder.rs:1200`]({link(map_rs, 1200)})) and
+   [`fill_missing_values_by_neighbor`]({link(map_rs, 540)}) (driver
+   call at [`map_builder.rs:1201`]({link(map_rs, 1201)})) fill the `.`
+   gaps visible in Panel C from flanking blocks.
+3. [`count_matching_neighbors`]({link(map_rs, 935)}) (driver call at
+   [`map_builder.rs:1172`]({link(map_rs, 1172)})) and
+   [`mask_child_alleles`]({link(map_rs, 970)}) (driver call at
+   [`map_builder.rs:1187`]({link(map_rs, 1187)})) identify isolated
+   runs shorter than `--run` (default 10 markers) and mask them back
+   to `?` as likely sequencing noise, so that collapse does not invent
    spurious recombinations.
 4. [`perform_flips_in_place`]({link(map_rs, 702)}) enforces consistent
-   founder-letter orientation across blocks, since the two letters in a
-   founder's pair are interchangeable within any single block.
+   founder-letter orientation across blocks, since the two letters in
+   a founder's pair are interchangeable within any single block. The
+   driver calls it three times — before and after block collapse,
+   and again after gap fill — at
+   [`map_builder.rs:1135`]({link(map_rs, 1135)}),
+   [`map_builder.rs:1193`]({link(map_rs, 1193)}), and
+   [`map_builder.rs:1203`]({link(map_rs, 1203)}).
 
 After these steps, each kid's paternal and maternal slots are fully
 resolved — shown on separate rows per kid in the panel above. Kid3's
 highlighted A→B transition on the paternal row is emitted to
 `{{prefix}}.recombinants.txt` by
-[`summarize_child_changes`]({link(map_rs, 673)}).
+[`summarize_child_changes`]({link(map_rs, 673)}) (driver call at
+[`map_builder.rs:1228`]({link(map_rs, 1228)})).
 
 ## 5. Truth versus deduced
 
@@ -675,9 +700,11 @@ Reconstructing which allele each letter represents at every VCF site
 is the job of `gtg-concordance`, which will have its own wiki page
 once migrated. For every block, `gtg-concordance` enumerates the
 `2^F` founder-phase orientations produced by
-[`Iht::founder_phase_orientations`]({link(iht_rs, 492)}), maps letters
-to VCF alleles via [`assign_genotypes`]({link(iht_rs, 442)}), and picks
-the orientation that minimises mismatches against the observed
+[`Iht::founder_phase_orientations`]({link(iht_rs, 492)}) (driver call
+at [`gtg_concordance.rs:256`]({link(concord_rs, 256)})), maps letters
+to VCF alleles via [`assign_genotypes`]({link(iht_rs, 442)}) (driver
+call at [`gtg_concordance.rs:267`]({link(concord_rs, 267)})), and
+picks the orientation that minimises mismatches against the observed
 genotypes. The split of responsibilities is deliberate and strict:
 `gtg-ped-map` writes only letters and only at informative sites, while
 `gtg-concordance` is the sole place where letter→allele correspondence
