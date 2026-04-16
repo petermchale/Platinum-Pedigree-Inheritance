@@ -1226,20 +1226,19 @@ sequence of each haplotype is reconstructed downstream by
 # Component 3 — gtg-concordance phasing at non-informative sites
 # ---------------------------------------------------------------------------
 #
-# Rust cross-references:
-#   find_best_phase_orientation (enumerates 2^F founder orientations,
-#   picks the one with fewest observed/expected mismatches)
-#     code/rust/src/bin/gtg_concordance.rs:252-305
-#   assign_genotypes (letter -> VCF allele propagation)
-#     code/rust/src/iht.rs:442-489
-#   founder_phase_orientations (2^F enumeration)
-#     code/rust/src/iht.rs:492-524
-#   pass / fail split and phased VCF emission
-#     code/rust/src/bin/gtg_concordance.rs:437-538
+# Rust cross-references (all permalinks assembled in `_emit_component3_markdown`):
+#   main()                             gtg_concordance.rs:315
+#   parse_ihtv2_file                   iht.rs:606           (driver: gtg_concordance.rs:405)
+#   find_best_phase_orientation        gtg_concordance.rs:252 (driver: gtg_concordance.rs:454)
+#   Iht::founder_phase_orientations    iht.rs:492           (driver: gtg_concordance.rs:256)
+#   Iht::assign_genotypes              iht.rs:442           (driver: gtg_concordance.rs:487 / :514)
+#   compare_genotype_maps              gtg_concordance.rs:213 (driver: gtg_concordance.rs:268)
+#   {prefix}.fail.vcf writes            gtg_concordance.rs:444 / :450 / :507
+#   {prefix}.pass.vcf write             gtg_concordance.rs:534
 #
 # Setup: reuse the nuclear family from Component 1 and focus on the LEFT
 # block of the chromosome where kid labels are Kid1=(A,C), Kid2=(B,D),
-# Kid3=(A,C). Add three EXTRA sites inside that block where both parents
+# Kid3=(A,C). Add two EXTRA sites inside that block where both parents
 # are heterozygous (0/1 x 0/1). Such sites are NON-informative for
 # gtg-ped-map (neither parent has a unique allele), so they contribute
 # nothing to building the block, but gtg-concordance still has to phase
@@ -1250,9 +1249,8 @@ sequence of each haplotype is reconstructed downstream by
 # Kid3 is taken from the LEFT block (Kid3 = (A,C) before the recombination).
 NON_INFORMATIVE_SITES = [
     # (label, A_allele, B_allele, C_allele, D_allele)
-    ("N1", 0, 1, 0, 1),   # A=0,B=1,C=0,D=1 -> Kid1 0/0, Kid2 1/1, Kid3 0/0
-    ("N2", 1, 0, 1, 0),   # A=1,B=0,C=1,D=0 -> Kid1 1/1, Kid2 0/0, Kid3 1/1
-    ("N3", 0, 1, 1, 0),   # A=0,B=1,C=1,D=0 -> Kid1 0/1, Kid2 0/1, Kid3 0/1
+    ("N1", 0, 1, 0, 1),   # clean pass: exactly one orientation consistent
+    ("N2", 0, 1, 1, 0),   # with injected error: no orientation consistent
 ]
 
 # Block letter labels (from Component 1, left-half of the chromosome).
@@ -1262,10 +1260,15 @@ BLOCK_LABELS = {
     "Kid3": ("A", "C"),
 }
 
+# Inject a sequencing error at site N2: Kid1's observed genotype is 1/1
+# although the simulation truth is 0/1.
+CONCORDANCE_ERROR_INJECTION: Dict[str, Dict[str, Tuple[int, int]]] = {
+    "N2": {"Kid1": (1, 1)},
+}
+
 
 def _site_genotypes(a: int, b: int, c: int, d: int) -> Dict[str, Tuple[int, int]]:
-    """Compute the TRUE (paternal, maternal) phased allele pair for each kid
-    from the founder haplotype alleles at one site."""
+    """Return TRUE (paternal, maternal) allele pairs at one site."""
     return {
         "Dad": (a, b),
         "Mom": (c, d),
@@ -1286,12 +1289,11 @@ def _expected_under_orientation(
     mom_vcf: Tuple[int, int],
     block_labels: Dict[str, Tuple[str, str]],
 ) -> Dict[str, Tuple[int, int]]:
-    """Mirrors iht.rs:442 assign_genotypes.
+    """Mirror of Iht::assign_genotypes (iht.rs:442).
 
-    `dad_letters` and `mom_letters` are the founder letter pair under the
-    current orientation (e.g. ('A','B') or ('B','A')). The VCF allele pairs
-    are stored sorted (min, max). letter[0] gets mapped to vcf[0], letter[1]
-    gets mapped to vcf[1]. Kids' letters are then looked up in this map.
+    Under the orientation (dad_letters, mom_letters), dad's sorted VCF
+    allele pair maps onto (dad_letters[0], dad_letters[1]) and similarly
+    for mom. Kids' letters are then looked up in that letter->allele map.
     """
     letter_to_allele: Dict[str, int] = {
         dad_letters[0]: dad_vcf[0],
@@ -1308,7 +1310,7 @@ def _expected_under_orientation(
     return expected
 
 
-# All 2^2 = 4 orientations of dad/mom letter pairs.
+# All 2^2 = 4 orientations of the two founder letter pairs.
 ORIENTATIONS: List[Tuple[Tuple[str, str], Tuple[str, str]]] = [
     (("A", "B"), ("C", "D")),
     (("B", "A"), ("C", "D")),
@@ -1337,22 +1339,20 @@ def _fmt_phased(pair: Tuple[int, int]) -> str:
     return f"{pair[0]}|{pair[1]}"
 
 
-def component_3_concordance(out_path: Path) -> None:
+def component_3_concordance(out_dir: Path) -> None:
+    """Render the gtg-concordance component as a dedicated wiki page.
+
+    Panels and prose are written to `out_dir/concordance/`, mirroring the
+    layout used for the nuclear-family and three-generation pages.
+    """
     # -------------- Per-site orientation analysis --------------
-    # For each site, compute truth, observed (maybe with injected error),
-    # run the 4 orientations, and record mismatches + winner.
-
-    # Inject a sequencing error: flip Kid1's observed genotype at site N3
-    # from the truth (0/1) to 1/1.
-    error_injection = {"N3": {"Kid1": (1, 1)}}
-
     per_site = []
     for label, a, b, c, d in NON_INFORMATIVE_SITES:
         truth = _site_genotypes(a, b, c, d)
 
         observed = {k: _sorted_unphased(v) for k, v in truth.items()}
-        if label in error_injection:
-            for k, v in error_injection[label].items():
+        if label in CONCORDANCE_ERROR_INJECTION:
+            for k, v in CONCORDANCE_ERROR_INJECTION[label].items():
                 observed[k] = _sorted_unphased(v)
 
         dad_vcf = _sorted_unphased(observed["Dad"])
@@ -1373,260 +1373,252 @@ def component_3_concordance(out_path: Path) -> None:
             "observed": observed,
             "orient_results": orient_results,
             "best": best,
-            "error": label in error_injection,
+            "error": label in CONCORDANCE_ERROR_INJECTION,
         })
 
-    # ------------------------------------------------------------------
-    # Figure layout: 3 rows x 2 cols = 6 panels.
-    # ------------------------------------------------------------------
-    fig, axes = plt.subplots(3, 2, figsize=(16, 14))
-    plt.subplots_adjust(
-        left=0.03, right=0.985, top=0.96, bottom=0.03,
-        wspace=0.08, hspace=0.35,
-    )
+    c_dir = out_dir / "concordance"
+    c_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- Panel A: block letter labels (reminder from Component 1) ---
-    body_a = [
-        "Block letter labels in the left half of the chromosome",
-        "(from gtg-ped-map output, Component 1):",
+    # ------------------------------------------------------------------
+    # Figure 1 — block letter map (the gtg-ped-map output that
+    # gtg-concordance reads in as its input).
+    # ------------------------------------------------------------------
+    body_1 = [
+        "Figure 1 — Block letter map (input to gtg-concordance)",
         "",
-        "  Dad  : (A, B)    <- fresh founder letters",
-        "  Mom  : (C, D)    <- fresh founder letters",
-        "  Kid1 : (A, C)",
-        "  Kid2 : (B, D)",
-        "  Kid3 : (A, C)    <- left-half, before the paternal recombination",
+        "Letter labels in the left half of the chromosome,",
+        "as written by gtg-ped-map into {prefix}.iht.txt:",
         "",
-        "These letters are constant inside one IHT block. gtg-concordance",
-        "runs over EVERY VCF site inside the block, including sites that",
-        "gtg-ped-map could not use to build the block (because neither",
-        "parent has a unique allele).",
+        "Dad  p:  A    <- founder, paternal homolog",
+        "Dad  m:  B    <- founder, maternal homolog",
+        "Mom  p:  C    <- founder, paternal homolog",
+        "Mom  m:  D    <- founder, maternal homolog",
+        "Kid1 p:  A",
+        "Kid1 m:  C",
+        "Kid2 p:  B",
+        "Kid2 m:  D",
+        "Kid3 p:  A    <- left half, before the paternal recomb",
+        "Kid3 m:  C",
+        "",
+        "These letters are constant inside one IHT block.",
+        "gtg-concordance re-reads the VCF for the same region and",
+        "attempts to phase EVERY variant in the block, not only the",
+        "informative ones that built it.",
     ]
-    cap_a = (
-        "Panel A. Input to gtg-concordance for this block: the letter map "
-        "written by gtg-ped-map into {prefix}.iht.txt and parsed by "
-        "parse_ihtv2_file (iht.rs:606). gtg-concordance re-reads the VCF "
-        "for the same region and attempts to phase EVERY variant, not only "
-        "the informative ones that built the block."
-    )
-    text_panel(axes[0, 0], "A. Block letter map (input to gtg-concordance)", body_a, cap_a)
+    _render_panel_image(body_1, c_dir / "fig1.png")
 
-    # --- Panel B: the three non-informative sites ---
-    body_b = [
-        "Three additional sites INSIDE the block where both parents are het:",
+    # ------------------------------------------------------------------
+    # Figure 2 — the two non-informative sites inside the block.
+    # ------------------------------------------------------------------
+    site_cols = ["Site", "Dad", "Mom", "Kid1", "Kid2", "Kid3"]
+    site_widths = [8, 6, 6, 6, 6, 6]
+
+    def _cols(items: List[str], widths: List[int], trailing: str = "") -> str:
+        parts = [f"{item:<{w}}" for item, w in zip(items, widths)]
+        return "".join(parts).rstrip() + trailing
+
+    body_2 = [
+        "Figure 2 — Non-informative sites inside the block",
         "",
-        "             Dad   Mom   Kid1  Kid2  Kid3    <- observed genotypes",
+        "Two additional sites INSIDE the block where both parents are het:",
+        "",
+        _cols(site_cols, site_widths, "   <- observed genotypes"),
     ]
     for s in per_site:
         obs = s["observed"]
-        tag = "  (ERROR)" if s["error"] else ""
-        body_b.append(
-            f"  {s['label']} :     "
-            f"{_fmt_gt(obs['Dad'])}   {_fmt_gt(obs['Mom'])}   "
-            f"{_fmt_gt(obs['Kid1'])}   {_fmt_gt(obs['Kid2'])}   "
-            f"{_fmt_gt(obs['Kid3'])}{tag}"
+        tag = "   (ERROR)" if s["error"] else ""
+        body_2.append(
+            _cols(
+                [
+                    s["label"],
+                    _fmt_gt(obs["Dad"]),
+                    _fmt_gt(obs["Mom"]),
+                    _fmt_gt(obs["Kid1"]),
+                    _fmt_gt(obs["Kid2"]),
+                    _fmt_gt(obs["Kid3"]),
+                ],
+                site_widths,
+                tag,
+            )
         )
-    body_b += [
+    body_2 += [
         "",
         "At every site here, dad and mom are both 0/1:",
-        "  unique_allele(dad, mom) = {} and unique_allele(mom, dad) = {}",
-        "  => NON-informative for gtg-ped-map (nothing added to the block)",
-        "  => still phaseable by gtg-concordance via the block letter map",
+        "unique_allele(dad, mom) = {} and unique_allele(mom, dad) = {}",
+        "=> NON-informative for gtg-ped-map (nothing added to the block)",
+        "=> still phaseable by gtg-concordance via the block letter map",
         "",
-        "Site N3 carries an INJECTED sequencing error: Kid1 observed as",
+        "Site N2 carries an INJECTED sequencing error: Kid1 observed as",
         "1/1 when the simulation truth is 0/1.",
     ]
-    cap_b = (
-        "Panel B. Non-informative sites — the cases Component 1 could not "
-        "touch. Because dad and mom are both heterozygous, unique_allele "
-        "(map_builder.rs:243) returns None and gtg-ped-map emits nothing "
-        "at these sites. gtg-concordance, however, visits every VCF record "
-        "in the block (gtg_concordance.rs:437)."
-    )
-    text_panel(axes[0, 1], "B. Non-informative sites inside the block", body_b, cap_b)
+    _render_panel_image(body_2, c_dir / "fig2.png")
 
-    # --- Panel C: orientation enumeration at site N1 ---
+    # ------------------------------------------------------------------
+    # Figure 3 — orientation enumeration at the clean site N1.
+    # ------------------------------------------------------------------
     s1 = per_site[0]
-    body_c = [
-        f"Site {s1['label']}:  Dad=0/1  Mom=0/1  Kid1=0/0  Kid2=1/1  Kid3=0/0",
+    obs1 = s1["observed"]
+
+    orient_cols_full = ["orient", "letter->allele map", "expected kids", "#mis"]
+    orient_widths_full = [13, 24, 24, 5]
+
+    body_3 = [
+        f"Figure 3 — Four orientations at site {s1['label']} (clean pass)",
         "",
-        "founder_phase_orientations() (iht.rs:492) enumerates 2^F=4",
-        "orientations.  For each one, assign_genotypes() (iht.rs:442)",
-        "maps letter -> VCF allele and propagates to the kids:",
+        f"Site {s1['label']}:  "
+        f"Dad={_fmt_gt(obs1['Dad'])}  "
+        f"Mom={_fmt_gt(obs1['Mom'])}  "
+        f"Kid1={_fmt_gt(obs1['Kid1'])}  "
+        f"Kid2={_fmt_gt(obs1['Kid2'])}  "
+        f"Kid3={_fmt_gt(obs1['Kid3'])}",
         "",
-        "   orient      letter->allele map     expected kids      #mis",
-        "   --------    ---------------------  -----------------  ----",
+        "For each 2^F=4 orientation, assign_genotypes maps letter -> VCF",
+        "allele and propagates to the kids:",
+        "",
+        _cols(orient_cols_full, orient_widths_full),
+        _cols(["-" * (w - 1) for w in orient_widths_full], orient_widths_full),
     ]
-    for i, (dl, ml, exp, nmis) in enumerate(s1["orient_results"]):
+    for dl, ml, exp, nmis in s1["orient_results"]:
+        dad_pair = _sorted_unphased(obs1["Dad"])
+        mom_pair = _sorted_unphased(obs1["Mom"])
+        orient = f"({dl[0]},{dl[1]}),({ml[0]},{ml[1]})"
         map_str = (
-            f"{dl[0]}->{_sorted_unphased(s1['observed']['Dad'])[0]}, "
-            f"{dl[1]}->{_sorted_unphased(s1['observed']['Dad'])[1]}, "
-            f"{ml[0]}->{_sorted_unphased(s1['observed']['Mom'])[0]}, "
-            f"{ml[1]}->{_sorted_unphased(s1['observed']['Mom'])[1]}"
+            f"{dl[0]}->{dad_pair[0]},{dl[1]}->{dad_pair[1]},"
+            f"{ml[0]}->{mom_pair[0]},{ml[1]}->{mom_pair[1]}"
         )
         kids = (
             f"K1={_fmt_gt(exp['Kid1'])} "
             f"K2={_fmt_gt(exp['Kid2'])} "
             f"K3={_fmt_gt(exp['Kid3'])}"
         )
-        star = "  <- winner" if nmis == 0 else ""
-        body_c.append(
-            f"   ({dl[0]},{dl[1]}),({ml[0]},{ml[1]})  {map_str}  {kids}    {nmis}{star}"
+        star = "   <- winner" if nmis == 0 else ""
+        body_3.append(
+            _cols([orient, map_str, kids, str(nmis)], orient_widths_full, star)
         )
 
-    # Phased output for the winning orientation.
     best_exp = s1["best"][2]
-    body_c += [
+    body_3 += [
         "",
         "Phased output under the winning orientation:",
-        f"  Kid1 : {_fmt_phased(best_exp['Kid1'])}   (paternal=A, maternal=C)",
-        f"  Kid2 : {_fmt_phased(best_exp['Kid2'])}   (paternal=B, maternal=D)",
-        f"  Kid3 : {_fmt_phased(best_exp['Kid3'])}   (paternal=A, maternal=C)",
+        f"Kid1 p|m:  {_fmt_phased(best_exp['Kid1'])}   (paternal=A, maternal=C)",
+        f"Kid2 p|m:  {_fmt_phased(best_exp['Kid2'])}   (paternal=B, maternal=D)",
+        f"Kid3 p|m:  {_fmt_phased(best_exp['Kid3'])}   (paternal=A, maternal=C)",
     ]
-    cap_c = (
-        "Panel C. Orientation search at non-informative site N1. Only "
-        "one of the four 2^F orientations yields zero mismatches; that "
-        "orientation fixes the letter→allele map at this site and the "
-        "block letter labels then immediately give the kids' phased "
-        "genotypes. Compare this panel to format_genotype_maps "
-        "(gtg_concordance.rs:151) — it prints essentially the same table."
-    )
-    text_panel(axes[1, 0], "C. Four orientations at site N1", body_c, cap_c)
+    _render_panel_image(body_3, c_dir / "fig3.png")
 
-    # --- Panel D: orientation search at the ERROR site ---
-    s3 = per_site[2]  # N3
-    body_d = [
-        f"Site {s3['label']} (ERROR): "
-        f"Dad={_fmt_gt(s3['observed']['Dad'])} "
-        f"Mom={_fmt_gt(s3['observed']['Mom'])} "
-        f"Kid1={_fmt_gt(s3['observed']['Kid1'])} (err)",
-        f"                 Kid2={_fmt_gt(s3['observed']['Kid2'])}  "
-        f"Kid3={_fmt_gt(s3['observed']['Kid3'])}",
+    # ------------------------------------------------------------------
+    # Figure 4 — orientation search at the error site N2.
+    # ------------------------------------------------------------------
+    s2 = per_site[1]
+    obs2 = s2["observed"]
+
+    orient_cols_slim = ["orient", "expected kids", "#mis"]
+    orient_widths_slim = [13, 24, 5]
+
+    body_4 = [
+        f"Figure 4 — Four orientations at site {s2['label']} (injected error)",
         "",
-        "   orient                expected kids       #mis",
-        "   --------              ------------------  ----",
+        f"Site {s2['label']} (ERROR):  "
+        f"Dad={_fmt_gt(obs2['Dad'])}  "
+        f"Mom={_fmt_gt(obs2['Mom'])}  "
+        f"Kid1={_fmt_gt(obs2['Kid1'])} (err)  "
+        f"Kid2={_fmt_gt(obs2['Kid2'])}  "
+        f"Kid3={_fmt_gt(obs2['Kid3'])}",
+        "",
+        _cols(orient_cols_slim, orient_widths_slim),
+        _cols(["-" * (w - 1) for w in orient_widths_slim], orient_widths_slim),
     ]
-    for dl, ml, exp, nmis in s3["orient_results"]:
+    for dl, ml, exp, nmis in s2["orient_results"]:
+        orient = f"({dl[0]},{dl[1]}),({ml[0]},{ml[1]})"
         kids = (
             f"K1={_fmt_gt(exp['Kid1'])} "
             f"K2={_fmt_gt(exp['Kid2'])} "
             f"K3={_fmt_gt(exp['Kid3'])}"
         )
-        body_d.append(
-            f"   ({dl[0]},{dl[1]}),({ml[0]},{ml[1]})         {kids}      {nmis}"
-        )
-    min_mis = min(r[3] for r in s3["orient_results"])
-    body_d += [
+        body_4.append(_cols([orient, kids, str(nmis)], orient_widths_slim))
+    min_mis = min(r[3] for r in s2["orient_results"])
+    body_4 += [
         "",
         f"Minimum mismatch across all 4 orientations: {min_mis}",
         "",
-        "Since no orientation yields 0 mismatches, the site is written",
-        "to {prefix}.fail.vcf by gtg_concordance.rs:507 and the",
-        "offending sample(s) are logged to {prefix}.failed_sites.txt.",
-        "",
-        "If exactly ONE sample is the culprit across the whole block, the",
-        "failure is counted as a 'singleton' — a strong signal of a",
-        "sequencing error in that one sample at that one site.",
+        "No orientation yields 0 mismatches, so the site is written to",
+        "{prefix}.fail.vcf and the offending sample(s) are logged to",
+        "{prefix}.failed_sites.txt. If exactly ONE sample is the culprit",
+        "across the whole block, the failure is counted as a 'singleton',",
+        "a strong signal of a sequencing error in that one sample.",
     ]
-    cap_d = (
-        "Panel D. The 'impossible genotype' rule. At site N3 we flipped "
-        "Kid1's observed genotype 0/1 → 1/1. No orientation can explain "
-        "this under the block's letter labels, so find_best_phase_orientation "
-        "(gtg_concordance.rs:252) returns a non-empty mismatch list and the "
-        "site is routed to fail.vcf. This is how gtg-concordance filters "
-        "sequencing errors, Mendelian violations, and residual block-"
-        "labelling mistakes."
-    )
-    text_panel(axes[1, 1], "D. Sequencing error → impossible genotype", body_d, cap_d)
+    _render_panel_image(body_4, c_dir / "fig4.png")
 
-    # --- Panel E: truth-vs-deduced phased genotypes for all 3 sites ---
-    body_e = [
-        "Phased output vs simulated truth for all three non-informative",
-        "sites (kids only):",
+    # ------------------------------------------------------------------
+    # Figure 5 — truth vs deduced phased genotypes, paternal and
+    # maternal on separate rows per kid.
+    # ------------------------------------------------------------------
+    body_5 = [
+        "Figure 5 — Truth vs deduced phased genotypes",
         "",
-        "             TRUTH                       DEDUCED (gtg-concordance)",
+        "Truth (T) vs deduced (D) phased genotypes at the two sites:",
+        "",
     ]
-    all_correct = True
+    all_pass = True
     for s in per_site:
         truth = s["truth"]
         if s["best"][3] == 0:
             dedu = s["best"][2]
-            status = "PASS"
+            status = "PASS -> pass.vcf"
         else:
             dedu = None
-            status = "FAIL (->fail.vcf)"
-        truth_str = (
-            f"K1={_fmt_phased(truth['Kid1'])} "
-            f"K2={_fmt_phased(truth['Kid2'])} "
-            f"K3={_fmt_phased(truth['Kid3'])}"
-        )
-        if dedu is None:
-            dedu_str = "(no phasing emitted)"
-        else:
-            dedu_str = (
-                f"K1={_fmt_phased(dedu['Kid1'])} "
-                f"K2={_fmt_phased(dedu['Kid2'])} "
-                f"K3={_fmt_phased(dedu['Kid3'])}"
-            )
-            for k in ["Kid1", "Kid2", "Kid3"]:
-                if _sorted_unphased(truth[k]) != _sorted_unphased(dedu[k]):
-                    all_correct = False
-        body_e.append(
-            f"  {s['label']} :     {truth_str}    {dedu_str}   [{status}]"
-        )
-    body_e += [
-        "",
-        f"All PASS sites phased correctly: {all_correct}",
-        "The FAIL site (N3) is NOT phased — it is written to",
-        "{prefix}.fail.vcf alongside low-quality and no-call records.",
-    ]
-    cap_e = (
-        "Panel E. Deduced phased genotypes at the PASS sites match the "
-        "simulated truth exactly; the error site is quarantined. This "
-        "closes the pipeline: gtg-ped-map builds a structural letter map "
-        "from informative sites only, and gtg-concordance uses that map "
-        "to phase every other site in each block — falling back to a "
-        "fail-vcf when no orientation is consistent."
-    )
-    text_panel(axes[2, 0], "E. Truth vs deduced phased genotypes", body_e, cap_e)
+            status = "FAIL -> fail.vcf"
+            all_pass = False
+        body_5.append(f"Site {s['label']}    [{status}]")
+        for kid in ["Kid1", "Kid2", "Kid3"]:
+            tp, tm = truth[kid]
+            if dedu is None:
+                dp_str = "."
+                dm_str = "."
+            else:
+                dp_str = str(dedu[kid][0])
+                dm_str = str(dedu[kid][1])
+            body_5.append(f"{kid} p   T: {tp}   D: {dp_str}")
+            body_5.append(f"{kid} m   T: {tm}   D: {dm_str}")
+        body_5.append("")
 
-    # --- Panel F: Boundary statement between the two tools ---
-    body_f = [
-        "Responsibility split:",
-        "",
-        "  gtg-ped-map (map_builder.rs)",
-        "    - uses ONLY informative sites",
-        "    - writes LETTERS per individual per block",
-        "    - no 0/1 allele sequences leave this tool",
-        "",
-        "  gtg-concordance (gtg_concordance.rs)",
-        "    - visits EVERY VCF record inside each block",
-        "    - enumerates 2^F founder orientations",
-        "    - picks the one with zero mismatches",
-        "    - emits phased genotypes (pass.vcf) or routes to fail.vcf",
-        "",
-        "This is the answer to 'does gtg-ped-map reconstruct the 0/1",
-        "allele sequence of each haplotype?': no, that is handled",
-        "exclusively by gtg-concordance via assign_genotypes.",
-    ]
-    cap_f = (
-        "Panel F. Responsibility split between the two binaries. The "
-        "separation is clean: gtg-ped-map is a pure structural-labeling "
-        "tool operating on informative sites, and gtg-concordance is a "
-        "pure phasing/QC tool that uses those structural labels to assign "
-        "alleles at every site."
+    total_slots = len(NON_INFORMATIVE_SITES) * 3 * 2
+    pass_slots = sum(
+        3 * 2 for s in per_site if s["best"][3] == 0
     )
-    text_panel(axes[2, 1], "F. Tool boundary", body_f, cap_f)
+    mismatches = 0
+    for s in per_site:
+        if s["best"][3] != 0:
+            continue
+        dedu = s["best"][2]
+        for kid in ["Kid1", "Kid2", "Kid3"]:
+            tp, tm = s["truth"][kid]
+            dp, dm = dedu[kid]
+            if tp != dp:
+                mismatches += 1
+            if tm != dm:
+                mismatches += 1
+    body_5.append(
+        f"At PASS sites: {mismatches} phased-allele mismatches out of "
+        f"{pass_slots} slots."
+    )
+    body_5.append(
+        "FAIL sites are NOT phased — they are written as-is to fail.vcf."
+    )
+    _render_panel_image(body_5, c_dir / "fig5.png")
 
-    fig.suptitle(
-        "Component 3 — Phasing non-informative sites with gtg-concordance",
-        fontsize=13, fontweight="bold",
+    # ------------------------------------------------------------------
+    # Markdown narrative.
+    # ------------------------------------------------------------------
+    _emit_component3_markdown(
+        c_dir / "concordance.md",
+        per_site=per_site,
+        mismatches=mismatches,
+        pass_slots=pass_slots,
+        total_slots=total_slots,
     )
 
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=200)
-    plt.close(fig)
-
-    print(f"[component 3] Wrote {out_path}")
+    print(f"[component 3] Wrote panel PNGs + markdown to {c_dir}")
     for s in per_site:
         print(
             f"[component 3] site {s['label']}: "
@@ -1634,6 +1626,174 @@ def component_3_concordance(out_path: Path) -> None:
             f"error={'yes' if s['error'] else 'no'}"
         )
 
+
+def _emit_component3_markdown(
+    out_path: Path,
+    *,
+    per_site: List[Dict],
+    mismatches: int,
+    pass_slots: int,
+    total_slots: int,
+) -> None:
+    """Write the Component-3 narrative that interleaves panel PNGs with
+    prose explanations and Rust-source permalinks.
+    """
+    def link(path: str, line: int) -> str:
+        return permalink(path, line, SHA)
+
+    conc_rs = "code/rust/src/bin/gtg_concordance.rs"
+    iht_rs = "code/rust/src/iht.rs"
+    map_rs = "code/rust/src/bin/map_builder.rs"
+
+    n1 = per_site[0]
+    n2 = per_site[1]
+    n2_min_mis = min(r[3] for r in n2["orient_results"])
+
+    content = f"""\
+# Closing the loop with `gtg-concordance`
+
+This page is part of the [wiki](../index.md) and picks up where the
+[nuclear-family walkthrough](../nuclear_family/nuclear_family.md) left
+off. `gtg-ped-map` emits only founder letters, and only at informative
+sites; it never reconstructs the 0/1 allele sequence of any haplotype.
+That job belongs to `gtg-concordance`, which re-reads the VCF for each
+IHT block and phases **every** variant using the block's letter map.
+All line numbers refer to commit `{SHA[:7]}`. As in the other
+walkthrough pages, each function link is followed by its call site in
+the driver — `main()` in
+[`gtg_concordance.rs`]({link(conc_rs, 315)}) — so you can step through
+the driver source in parallel with this walkthrough.
+
+The toy simulation reuses the left half of the nuclear-family block
+(Kid1=(A,C), Kid2=(B,D), Kid3=(A,C)) and adds two sites where both
+parents are heterozygous. These are NON-informative for `gtg-ped-map`
+because [`unique_allele`]({link(map_rs, 243)}) returns `None` at each
+of them, but `gtg-concordance` still has to phase them. One of the two
+sites carries an injected sequencing error so both the clean-pass
+(`pass.vcf`) and error-quarantine (`fail.vcf`) code paths are
+exercised. Everything below is reproducible by running
+
+```
+python wiki/generate_wiki.py --page concordance
+```
+
+which regenerates both the figure PNGs referenced here and this
+markdown file itself.
+
+## 1. Block letter map — the input to `gtg-concordance`
+
+![Figure 1 — Block letter map (input to gtg-concordance)](fig1.png)
+
+The driver reads the `{{prefix}}.iht.txt` file produced by
+`gtg-ped-map` using
+[`parse_ihtv2_file`]({link(iht_rs, 606)}) (driver call at
+[`gtg_concordance.rs:405`]({link(conc_rs, 405)})). Each entry carries
+one block's letter labels for every individual in the pedigree. Inside
+this block the letters are constant; for the left half of the
+nuclear-family chromosome they are the ones shown in Figure 1. Every
+VCF record whose position falls inside the block is then handed to
+the per-site phasing loop at
+[`gtg_concordance.rs:437`]({link(conc_rs, 437)}) — including variants
+that `gtg-ped-map` could not use because neither parent has a unique
+allele.
+
+## 2. Non-informative sites inside the block
+
+![Figure 2 — Non-informative sites inside the block](fig2.png)
+
+The two sites in Figure 2 are both homozygous-absent for informative
+patterns: dad is `0/1` and so is mom. `gtg-ped-map`'s
+[`unique_allele`]({link(map_rs, 243)}) test therefore returns `None`
+at both sites, so neither contributes to block construction. They
+still enter `gtg-concordance`'s phasing loop; the per-site machinery
+described below is what turns their unphased genotypes into either a
+phased `pass.vcf` record or a quarantined `fail.vcf` record.
+
+Site `N2` carries an **injected sequencing error**: Kid1 is reported
+as `1/1` even though the simulation truth is `0/1`. This is the case
+that the "impossible genotype" rule in Figure 4 is designed to catch.
+
+## 3. Orientation enumeration at a clean site
+
+![Figure 3 — Four orientations at site N1 (clean pass)](fig3.png)
+
+At every record inside a block,
+[`find_best_phase_orientation`]({link(conc_rs, 252)}) (driver call at
+[`gtg_concordance.rs:454`]({link(conc_rs, 454)})) enumerates the
+`2^F=4` orientations produced by
+[`Iht::founder_phase_orientations`]({link(iht_rs, 492)}) (invoked
+inside `find_best_phase_orientation` at
+[`gtg_concordance.rs:256`]({link(conc_rs, 256)})). Each orientation is
+a choice of which of dad's two sorted VCF alleles is tagged `A` vs `B`
+and which of mom's two is tagged `C` vs `D`. Under a given
+orientation,
+[`Iht::assign_genotypes`]({link(iht_rs, 442)}) (driver call at
+[`gtg_concordance.rs:487`]({link(conc_rs, 487)}) on the failing branch
+and [`gtg_concordance.rs:514`]({link(conc_rs, 514)}) on the passing
+branch) turns each kid's letter pair into an expected genotype. A
+straight equality check —
+[`compare_genotype_maps`]({link(conc_rs, 213)}) (driver call at
+[`gtg_concordance.rs:268`]({link(conc_rs, 268)})) — counts how many
+samples disagree with the observation.
+
+At site `N1`, exactly one of the four orientations explains every
+sample simultaneously; the three others each force a mismatch
+somewhere among the kids. The winning orientation fixes the
+letter→allele map at this site, and the block's letter labels
+immediately give the phased `p|m` genotypes shown beneath the
+orientation table.
+
+## 4. The "impossible genotype" rule
+
+![Figure 4 — Four orientations at site N2 (injected error)](fig4.png)
+
+At site `N2` the injected error means **no** orientation produces zero
+mismatches — the best any orientation can do is {n2_min_mis} sample(s)
+disagreeing. `find_best_phase_orientation` therefore returns a
+non-empty mismatch list, the driver writes the record to
+`{{prefix}}.fail.vcf` at
+[`gtg_concordance.rs:507`]({link(conc_rs, 507)}) (alongside the
+low-quality and no-call records that were already routed to fail at
+[`gtg_concordance.rs:444`]({link(conc_rs, 444)}) and
+[`gtg_concordance.rs:450`]({link(conc_rs, 450)})), and the offending
+sample names are appended to `{{prefix}}.failed_sites.txt`. If
+exactly one sample is the culprit across the whole block, the failure
+is counted as a "singleton" — a strong signal of a sequencing error
+in that one sample rather than a systemic block-labelling problem.
+
+This is the mechanism by which `gtg-concordance` filters sequencing
+errors, Mendelian violations, and residual block-labelling mistakes
+without ever producing a phased call that the block's structural
+labels cannot justify.
+
+## 5. Truth versus deduced phased genotypes
+
+![Figure 5 — Truth vs deduced phased genotypes](fig5.png)
+
+At the PASS site (`N1`), every kid's deduced paternal and maternal
+phased alleles match the simulation truth exactly
+({mismatches} mismatches out of {pass_slots} phased-allele slots). At
+the FAIL site (`N2`), no phased output is emitted — the record lands
+in `fail.vcf` untouched and the truth row in Figure 5 is shown only to
+document what `gtg-concordance` declined to commit to.
+
+This closes the pipeline. `gtg-ped-map` (`map_builder.rs`) is a pure
+structural-labelling tool that operates on informative sites only and
+writes founder letters per individual per block.
+`gtg-concordance` (`gtg_concordance.rs`) is a pure phasing/QC tool
+that uses those structural labels to assign alleles at every site in
+the block: the passing records are phased via
+[`Iht::assign_genotypes`]({link(iht_rs, 442)}) and emitted to
+`{{prefix}}.pass.vcf` at
+[`gtg_concordance.rs:534`]({link(conc_rs, 534)}), and the failing
+records are quarantined to `{{prefix}}.fail.vcf` as described above.
+The split is the answer to "does `gtg-ped-map` reconstruct the 0/1
+allele sequence of each haplotype?": no, and deliberately — that is
+handled exclusively by `gtg-concordance`.
+"""
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(content)
+    print(f"[wiki] Wrote {out_path}")
 
 # ---------------------------------------------------------------------------
 # Component 4 — Methods section (markdown)
@@ -1977,10 +2137,11 @@ python wiki/generate_wiki.py
    (Spouse) and adding a G3 sibship. Shows how the same single loop
    handles G2→G3 via ancestor-first depth ordering, without ever
    constructing a joint inheritance vector over all founders.
-3. *(coming soon)* **gtg-concordance phasing at non-informative
-   sites** — closes the pipeline by mapping founder letters back to
-   VCF alleles, with the "impossible genotype" rule that routes
-   sequencing errors to `fail.vcf`.
+3. [Closing the loop with gtg-concordance](concordance/concordance.md)
+   — closes the pipeline by mapping founder letters back to VCF
+   alleles at the sites `gtg-ped-map` could not touch. Introduces the
+   `2^F` founder-phase orientation search and the "impossible
+   genotype" rule that routes sequencing errors to `fail.vcf`.
 
 ## Reference pages
 
@@ -2029,9 +2190,7 @@ def main() -> None:
     pages = {
         "nuclear_family": lambda: component_1_nuclear_family(args.outdir),
         "three_generations": lambda: component_2_three_generations(args.outdir),
-        "concordance": lambda: component_3_concordance(
-            args.outdir / "component3_concordance.png"
-        ),
+        "concordance": lambda: component_3_concordance(args.outdir),
         "methods": lambda: emit_methods_section(
             args.outdir / "methods.md"
         ),
