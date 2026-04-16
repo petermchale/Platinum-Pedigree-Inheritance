@@ -756,370 +756,470 @@ is computed and written out.
 # then uses those already-assigned labels as "parent labels" for G2→G3.
 # Each descendant still carries only two characters, one per homolog.
 
-# Spouse (outside founder) haplotypes. Designed so every site is either
-# Kid2-informative (Kid2 het × Spouse hom) or Spouse-informative
-# (Kid2 hom × Spouse het) at the G2→G3 level.
-HAP_E = "000100010101"
-HAP_F = "010000000010"
+G3_NUM_SITES = 6
 
-# Grandkid transmissions (paternal slot, maternal slot).
-# Kid2 is the mother; Spouse is the father.
-#   Grandkid1 <- (E, B)           no recombination
-#   Grandkid2 <- (F, D)           no recombination
-#   Grandkid3 <- (E, B|D)         recombination in Kid2's gametogenesis:
-#                                 B on sites 0-5, D on sites 6-11
-GRANDKID1_LABELS = [("E", "B")] * NUM_SITES
-GRANDKID2_LABELS = [("F", "D")] * NUM_SITES
-GRANDKID3_LABELS = [("E", "B")] * 6 + [("E", "D")] * 6
+# Kid2 arrives at the G2->G3 pass already labelled (B,D) by the G1->G2 walk.
+# These two strings are her two homologs over the G3 panel's site window.
+G3_HAP_B = "010100"
+G3_HAP_D = "100110"
 
+# Spouse (outside founder) haplotypes — Iht::new hands him the next fresh
+# letter pair (E,F). Designed so that every informative situation appears
+# at least once across the 6 sites: Kid2-informative (Kid2 het x Spouse hom),
+# Spouse-informative (Spouse het x Kid2 hom), and one fully non-informative
+# site to exercise block fill.
+G3_HAP_E = "000000"
+G3_HAP_F = "001100"
 
-def _letter_to_allele(letter: str, site: int) -> int:
-    return {
-        "A": _hap_to_alleles(HAP_A),
-        "B": _hap_to_alleles(HAP_B),
-        "C": _hap_to_alleles(HAP_C),
-        "D": _hap_to_alleles(HAP_D),
-        "E": _hap_to_alleles(HAP_E),
-        "F": _hap_to_alleles(HAP_F),
-    }[letter][site]
+# Grandkid transmissions (paternal slot = Spouse letter, maternal slot =
+# Kid2 letter).
+#   GK1 <- (E, B)             no recombination
+#   GK2 <- (F, D)             no recombination
+#   GK3 <- (E, B|D)           maternal recomb: B at sites 0-3, D at sites 4-5
+G3_GK1_LABELS = [("E", "B")] * G3_NUM_SITES
+G3_GK2_LABELS = [("F", "D")] * G3_NUM_SITES
+G3_GK3_LABELS = [("E", "B")] * 4 + [("E", "D")] * 2
 
 
-def _genotype_from_labels(labels: List[Tuple[str, str]]) -> List[str]:
-    out = []
-    for i, (pat, mat) in enumerate(labels):
-        a = _letter_to_allele(pat, i)
-        b = _letter_to_allele(mat, i)
-        out.append(_unphased_gt(a, b))
-    return out
+def component_2_three_generations(out_dir: Path) -> None:
+    """Render the three-generation component as a dedicated wiki page.
 
+    Panels and prose are written to `out_dir/three_generations/`, mirroring
+    the layout used for the nuclear-family page.
+    """
+    hap = {
+        "B": _hap_to_alleles(G3_HAP_B),
+        "D": _hap_to_alleles(G3_HAP_D),
+        "E": _hap_to_alleles(G3_HAP_E),
+        "F": _hap_to_alleles(G3_HAP_F),
+    }
 
-def component_2_three_generations(out_path: Path) -> None:
-    sim = _build_simulation()
-    spouse_e = _hap_to_alleles(HAP_E)
-    spouse_f = _hap_to_alleles(HAP_F)
+    def gt_row(hap1: List[int], hap2: List[int]) -> List[str]:
+        return [_unphased_gt(hap1[i], hap2[i]) for i in range(G3_NUM_SITES)]
 
-    # Kid2's genotype row (same as Component 1).
-    kid2_unphased = sim["kid2_unphased"]
+    kid2_unphased = gt_row(hap["B"], hap["D"])
+    spouse_unphased = gt_row(hap["E"], hap["F"])
 
-    # Grandkid genotypes from true transmissions.
-    gk1_unphased = _genotype_from_labels(GRANDKID1_LABELS)
-    gk2_unphased = _genotype_from_labels(GRANDKID2_LABELS)
-    gk3_unphased = _genotype_from_labels(GRANDKID3_LABELS)
+    def genotype_from_labels(labels: List[Tuple[str, str]]) -> List[str]:
+        return [
+            _unphased_gt(hap[p][i], hap[m][i])
+            for i, (p, m) in enumerate(labels)
+        ]
 
-    # --- G2 → G3 informative-site analysis ---
-    # At a Kid2-informative site (Kid2 het × Spouse hom), Kid2's unique allele
-    # tells us whether she passed her B or her D haplotype to a given grandkid.
-    # That identification uses Kid2's *already-computed* labels (B,D) — so
-    # the method is recursive across generations.
-    kid2_info_sites = []
-    spouse_info_sites = []
-    for i in range(NUM_SITES):
-        kid2_het = sim["kid2_phased"][i][0] != sim["kid2_phased"][i][1]
-        spouse_het = spouse_e[i] != spouse_f[i]
+    gk_unphased: Dict[str, List[str]] = {
+        "GK1": genotype_from_labels(G3_GK1_LABELS),
+        "GK2": genotype_from_labels(G3_GK2_LABELS),
+        "GK3": genotype_from_labels(G3_GK3_LABELS),
+    }
+    truth_labels: Dict[str, List[Tuple[str, str]]] = {
+        "GK1": G3_GK1_LABELS,
+        "GK2": G3_GK2_LABELS,
+        "GK3": G3_GK3_LABELS,
+    }
+
+    kid2_info_sites: List[int] = []
+    spouse_info_sites: List[int] = []
+    for i in range(G3_NUM_SITES):
+        kid2_het = hap["B"][i] != hap["D"][i]
+        spouse_het = hap["E"][i] != hap["F"][i]
         if kid2_het and not spouse_het:
             kid2_info_sites.append(i)
         elif spouse_het and not kid2_het:
             spouse_info_sites.append(i)
 
     grandkids = ["GK1", "GK2", "GK3"]
-    gk_unphased = {"GK1": gk1_unphased, "GK2": gk2_unphased, "GK3": gk3_unphased}
 
-    # Deduce maternal labels (B or D) from Kid2-informative sites.
-    # At each Kid2-informative site, Kid2's unique allele corresponds to
-    # whichever of Kid2's two haplotypes (B or D) carries that allele. We use
-    # the *true* B/D haplotype strings because in Component 1 we verified
-    # that the Rust pass assigns exactly those labels to Kid2 at every site.
-    maternal_deduced_gk: Dict[str, List[str]] = {g: ["?"] * NUM_SITES for g in grandkids}
-    for s in kid2_info_sites:
-        kid2_alleles = {sim["kid2_phased"][s][0], sim["kid2_phased"][s][1]}
-        spouse_alleles = {spouse_e[s], spouse_f[s]}
+    def deduce_maternal_at(site: int) -> Dict[str, str]:
+        kid2_alleles = {hap["B"][site], hap["D"][site]}
+        spouse_alleles = {hap["E"][site], hap["F"][site]}
         unique = list(kid2_alleles - spouse_alleles)
         if not unique:
-            continue
-        unique = unique[0]
-        b_allele = _letter_to_allele("B", s)
-        carrier = "B" if b_allele == unique else "D"
+            return {g: "?" for g in grandkids}
+        u = unique[0]
+        carrier = "B" if hap["B"][site] == u else "D"
+        other = "D" if carrier == "B" else "B"
+        out: Dict[str, str] = {}
         for g in grandkids:
-            gt = gk_unphased[g][s]
+            gt = gk_unphased[g][site]
             gk_alleles = {int(gt[0]), int(gt[2])}
-            if unique in gk_alleles:
-                maternal_deduced_gk[g][s] = carrier
-            else:
-                maternal_deduced_gk[g][s] = "D" if carrier == "B" else "B"
+            out[g] = carrier if u in gk_alleles else other
+        return out
 
-    # Deduce paternal labels (E or F) from Spouse-informative sites.
-    paternal_deduced_gk: Dict[str, List[str]] = {g: ["?"] * NUM_SITES for g in grandkids}
-    for s in spouse_info_sites:
-        kid2_alleles = {sim["kid2_phased"][s][0], sim["kid2_phased"][s][1]}
-        spouse_alleles = {spouse_e[s], spouse_f[s]}
+    def deduce_paternal_at(site: int) -> Dict[str, str]:
+        kid2_alleles = {hap["B"][site], hap["D"][site]}
+        spouse_alleles = {hap["E"][site], hap["F"][site]}
         unique = list(spouse_alleles - kid2_alleles)
         if not unique:
-            continue
-        unique = unique[0]
-        carrier = "E" if spouse_e[s] == unique else "F"
+            return {g: "?" for g in grandkids}
+        u = unique[0]
+        carrier = "E" if hap["E"][site] == u else "F"
+        other = "F" if carrier == "E" else "E"
+        out: Dict[str, str] = {}
         for g in grandkids:
-            gt = gk_unphased[g][s]
+            gt = gk_unphased[g][site]
             gk_alleles = {int(gt[0]), int(gt[2])}
-            if unique in gk_alleles:
-                paternal_deduced_gk[g][s] = carrier
-            else:
-                paternal_deduced_gk[g][s] = "F" if carrier == "E" else "E"
+            out[g] = carrier if u in gk_alleles else other
+        return out
+
+    paternal_deduced: Dict[str, List[str]] = {g: ["?"] * G3_NUM_SITES for g in grandkids}
+    maternal_deduced: Dict[str, List[str]] = {g: ["?"] * G3_NUM_SITES for g in grandkids}
+    for s in kid2_info_sites:
+        d = deduce_maternal_at(s)
+        for g in grandkids:
+            maternal_deduced[g][s] = d[g]
+    for s in spouse_info_sites:
+        d = deduce_paternal_at(s)
+        for g in grandkids:
+            paternal_deduced[g][s] = d[g]
 
     def carry_forward(labels: List[str]) -> List[str]:
         out = list(labels)
         last = "?"
-        for i in range(NUM_SITES):
+        for i in range(G3_NUM_SITES):
             if out[i] != "?":
                 last = out[i]
             else:
                 out[i] = last
         last = "?"
-        for i in range(NUM_SITES - 1, -1, -1):
+        for i in range(G3_NUM_SITES - 1, -1, -1):
             if out[i] != "?":
                 last = out[i]
             else:
                 out[i] = last
         return out
 
-    paternal_blocks_gk = {g: carry_forward(paternal_deduced_gk[g]) for g in grandkids}
-    maternal_blocks_gk = {g: carry_forward(maternal_deduced_gk[g]) for g in grandkids}
+    paternal_blocks = {g: carry_forward(paternal_deduced[g]) for g in grandkids}
+    maternal_blocks = {g: carry_forward(maternal_deduced[g]) for g in grandkids}
 
-    truth_labels = {
-        "GK1": GRANDKID1_LABELS,
-        "GK2": GRANDKID2_LABELS,
-        "GK3": GRANDKID3_LABELS,
-    }
     mismatches = 0
     for g in grandkids:
-        for i in range(NUM_SITES):
-            truth = truth_labels[g][i]
-            dedu = (paternal_blocks_gk[g][i], maternal_blocks_gk[g][i])
-            if truth != dedu:
+        for i in range(G3_NUM_SITES):
+            pt, mt = truth_labels[g][i]
+            if pt != paternal_blocks[g][i]:
                 mismatches += 1
+            if mt != maternal_blocks[g][i]:
+                mismatches += 1
+    total_slots = G3_NUM_SITES * len(grandkids) * 2
+
+    tg_dir = out_dir / "three_generations"
+    tg_dir.mkdir(parents=True, exist_ok=True)
 
     # ------------------------------------------------------------------
-    # Figure layout: 3 rows × 2 cols.
+    # Figure 1 — pedigree with outside marriage + ground-truth haplotypes.
     # ------------------------------------------------------------------
-    fig, axes = plt.subplots(3, 2, figsize=(16, 14))
-    plt.subplots_adjust(
-        left=0.03, right=0.985, top=0.96, bottom=0.03,
-        wspace=0.08, hspace=0.35,
-    )
-
-    site_header = "site:  " + " ".join(f"{i:>1}" for i in range(NUM_SITES))
-
-    # --- Panel A: pedigree sketch ---
-    body_a = [
-        "          G1-Dad (A,B) --- G1-Mom (C,D)",
-        "                     |",
-        "          +----------+----------+",
-        "          |          |          |",
-        "        Kid1        Kid2       Kid3        <-- G2 (resolved first)",
-        "       (A,C)       (B,D)     (A|B,C)",
-        "                     |",
-        "                Kid2 --- Spouse (E,F)       <-- outside marriage",
-        "                     |",
-        "          +----------+----------+",
-        "          |          |          |",
-        "         GK1        GK2        GK3         <-- G3 (resolved next)",
-        "        (E,B)     (F,D)    (E, B|D recomb)",
+    body_1 = [
+        "Figure 1 — Three-generation pedigree with outside marriage",
         "",
-        "At G2 level, gtg-ped-map has already labeled Kid2 as (B,D).",
-        "At G3 level, Kid2 is treated as the 'mother' parent whose",
-        "haplotype labels are B,D; Spouse is a fresh founder labeled E,F.",
-    ]
-    cap_a = (
-        "Panel A. Three-generation pedigree. G1 founders Dad and Mom carry "
-        "the (A,B) and (C,D) letter pairs assigned by Iht::new "
-        "(iht.rs:172). In Component 1 we showed that Kid2 receives labels "
-        "(B,D) via track_alleles_through_pedigree (map_builder.rs:295). "
-        "Kid2 then marries Spouse, an outside founder who is brand-new to "
-        "the pedigree and therefore receives the next fresh letter pair, "
-        "(E,F). The same labeling routine is then applied to each G3 kid."
-    )
-    text_panel(axes[0, 0], "A. Pedigree with outside marriage", body_a, cap_a)
-
-    # --- Panel B: genotype table for Kid2, Spouse, and grandkids ---
-    def row(label, gts):
-        return label + " ".join(
-            g[0] + g[2] if g[0] == g[2] else "01" for g in gts
-        )
-    body_b = [
-        site_header,
-        row("Kid2  : ", kid2_unphased),
-        row("Spouse: ", [_unphased_gt(spouse_e[i], spouse_f[i]) for i in range(NUM_SITES)]),
-        row("GK1   : ", gk1_unphased),
-        row("GK2   : ", gk2_unphased),
-        row("GK3   : ", gk3_unphased),
+        "           G1-Dad (A,B) --- G1-Mom (C,D)",
+        "                      |",
+        "           +----------+----------+",
+        "           |          |          |",
+        "         Kid1        Kid2       Kid3        <-- G2 (resolved first)",
+        "        (A,C)       (B,D)     (A|B,C)",
+        "                      |",
+        "                 Kid2 --- Spouse (E,F)      <-- outside marriage",
+        "                      |",
+        "           +----------+----------+",
+        "           |          |          |",
+        "          GK1        GK2        GK3         <-- G3 (resolved next)",
+        "         (E,B)      (F,D)     (E, B|D)",
         "",
-        "Kid2's true haplotypes (already labelled by the G1->G2 pass):",
-        "  B     : " + " ".join(str(x) for x in _hap_to_alleles(HAP_B)),
-        "  D     : " + " ".join(str(x) for x in _hap_to_alleles(HAP_D)),
-        "Spouse's haplotypes (labelled E,F by Iht::new on this fresh founder):",
-        "  E     : " + " ".join(str(x) for x in spouse_e),
-        "  F     : " + " ".join(str(x) for x in spouse_f),
+        "Kid2's true haplotypes (already labelled B,D by the G1->G2 pass):",
+        "  B:  " + " ".join(str(x) for x in hap["B"]),
+        "  D:  " + " ".join(str(x) for x in hap["D"]),
+        "Spouse's true haplotypes (fresh founder, labelled E,F by Iht::new):",
+        "  E:  " + " ".join(str(x) for x in hap["E"]),
+        "  F:  " + " ".join(str(x) for x in hap["F"]),
+        "",
+        "True G2->G3 transmissions:",
+        "  GK1 <- (E,B)       paternal = E, maternal = B  (no recomb)",
+        "  GK2 <- (F,D)       paternal = F, maternal = D  (no recomb)",
+        "  GK3 <- (E,B|D)     maternal recomb: B at sites 0-3, D at 4-5",
     ]
-    cap_b = (
-        "Panel B. Unphased VCF rows for the G2→G3 nuclear unit. Kid2's rows "
-        "reuse the same data shown in Component 1 — the key point is that "
-        "her letter labels (B,D) are already known when the Rust routine "
-        "arrives at G3, because individuals are processed in ancestor-first "
-        "depth order via family.get_individual_depths() in ped.rs."
-    )
-    text_panel(axes[0, 1], "B. Input rows for the G2→G3 pass", body_b, cap_b)
+    _render_panel_image(body_1, tg_dir / "fig1.png")
 
-    # --- Panel C: informative-site split at G2→G3 ---
+    # ------------------------------------------------------------------
+    # Figure 2 — unphased VCF rows for the G2->G3 nuclear unit.
+    # ------------------------------------------------------------------
+    def _fmt_gt(g: str) -> str:
+        return g[0] + g[2] if g[0] == g[2] else "01"
+
+    body_2 = [
+        "Figure 2 — Unphased VCF rows for the G2->G3 pass",
+        "",
+        "Kid2  :   " + " ".join(_fmt_gt(g) for g in kid2_unphased),
+        "Spouse:   " + " ".join(_fmt_gt(g) for g in spouse_unphased),
+        "GK1   :   " + " ".join(_fmt_gt(g) for g in gk_unphased["GK1"]),
+        "GK2   :   " + " ".join(_fmt_gt(g) for g in gk_unphased["GK2"]),
+        "GK3   :   " + " ".join(_fmt_gt(g) for g in gk_unphased["GK3"]),
+        "",
+        "(0/0 rendered as '00', 0/1 as '01', 1/1 as '11')",
+    ]
+    _render_panel_image(body_2, tg_dir / "fig2.png")
+
+    # ------------------------------------------------------------------
+    # Figure 3 — recursive informative-site deduction.
+    # Row layout mirrors nuclear_family/fig3: paternal-indicator row first,
+    # then maternal-indicator row, then per-grandkid (p, m) rows with the
+    # paternal row always directly above its matching maternal row.
+    # ------------------------------------------------------------------
+    row_prefix_width = len("  GK1 p:    ")
+
     def mark_sites(site_list: List[int]) -> str:
-        marks = ["_"] * NUM_SITES
+        marks = ["_"] * G3_NUM_SITES
         for s in site_list:
             marks[s] = "*"
-        return "        " + " ".join(marks)
+        return (" " * row_prefix_width) + " ".join(marks)
 
-    body_c = [
-        site_header,
-        mark_sites(kid2_info_sites) + "   <- Kid2-informative (Kid2 het x Spouse hom)",
+    body_3 = [
+        "Figure 3 — Recursive informative-site deduction (G2 -> G3)",
+        "",
+        "Deduced founder-letter labels at informative sites only",
+        "('.' = site not informative for that slot):",
+        "",
         mark_sites(spouse_info_sites) + "   <- Spouse-informative (Spouse het x Kid2 hom)",
-        "",
-        "At each Kid2-informative site the unique allele tags whether",
-        "the grandkid inherited Kid2's B or D homolog.",
-        "At each Spouse-informative site it tags E or F.",
-        "",
-        "Deduced maternal labels (B or D) at Kid2-informative sites only:",
+        mark_sites(kid2_info_sites)   + "   <- Kid2-informative   (Kid2 het x Spouse hom)",
     ]
     for g in grandkids:
-        body_c.append(
-            "  " + g + ":  " + " ".join(
-                maternal_deduced_gk[g][i] if i in kid2_info_sites else "."
-                for i in range(NUM_SITES)
-            )
+        pat_row = f"  {g} p:    " + " ".join(
+            paternal_deduced[g][i] if i in spouse_info_sites else "."
+            for i in range(G3_NUM_SITES)
         )
-    body_c += ["", "Deduced paternal labels (E or F) at Spouse-informative sites only:"]
-    for g in grandkids:
-        body_c.append(
-            "  " + g + ":  " + " ".join(
-                paternal_deduced_gk[g][i] if i in spouse_info_sites else "."
-                for i in range(NUM_SITES)
-            )
+        mat_row = f"  {g} m:    " + " ".join(
+            maternal_deduced[g][i] if i in kid2_info_sites else "."
+            for i in range(G3_NUM_SITES)
         )
-    cap_c = (
-        "Panel C. Informative-site split at the G2→G3 level. The exact same "
-        "unique_allele routine (map_builder.rs:243) runs, but the 'parent' "
-        "labels it propagates are Kid2's already-resolved B/D labels plus "
-        "the freshly-created E/F labels on Spouse. This is what makes the "
-        "approach recursive without ever constructing a joint inheritance "
-        "vector over all founders."
-    )
-    text_panel(
-        axes[1, 0],
-        "C. Recursive informative-site deduction",
-        body_c, cap_c,
-    )
+        body_3.append(pat_row)
+        body_3.append(mat_row)
+    _render_panel_image(body_3, tg_dir / "fig3.png")
 
-    # --- Panel D: collapsed grandkid block map ---
-    highlight_spans = []
-    body_d = [
-        site_header,
+    # ------------------------------------------------------------------
+    # Figure 4 — collapsed blocks with GK3's maternal recombination, with
+    # paternal and maternal on separate rows for each grandkid.
+    # ------------------------------------------------------------------
+    body_4 = [
+        "Figure 4 — Collapsed blocks with G2->G3 recombination",
         "",
-        "Deduced (paternal | maternal) after block-fill:",
+        "Deduced labels after block collapse and gap-fill:",
+        "",
     ]
     for g in grandkids:
-        row_str = "  " + g + ":  " + " ".join(
-            paternal_blocks_gk[g][i] + maternal_blocks_gk[g][i] for i in range(NUM_SITES)
+        pat_row = f"  {g} p:    " + " ".join(
+            paternal_blocks[g][i] for i in range(G3_NUM_SITES)
         )
-        body_d.append(row_str)
-    body_d += [
+        mat_row = f"  {g} m:    " + " ".join(
+            maternal_blocks[g][i] for i in range(G3_NUM_SITES)
+        )
+        body_4.append(pat_row)
+        body_4.append(mat_row)
+    body_4 += [
         "",
-        "GK3's maternal slot switches B -> D at the site 5/6 boundary.",
-        "This reflects a crossover in Kid2's gametogenesis and is",
-        "emitted to {prefix}.recombinants.txt.",
+        "GK3's maternal row switches B -> D between sites 3 and 4;",
+        "this transition is written to {prefix}.recombinants.txt.",
     ]
-    # Highlight the switch in the GK3 row.
-    gk3_row = 4  # after header + blank + 'Deduced...' + GK1 + GK2
-    prefix_len = len("  GK3:  ")
-    col_site5 = prefix_len + 5 * 3
-    col_site6 = prefix_len + 6 * 3
-    highlight_spans.append((gk3_row, col_site5, col_site5 + 2, "#ffcc66"))
-    highlight_spans.append((gk3_row, col_site6, col_site6 + 2, "#ff9966"))
+    _render_panel_image(body_4, tg_dir / "fig4.png")
 
-    cap_d = (
-        "Panel D. Per-grandkid haplotype block map drawn from letters "
-        "{B,D,E,F}. Note what is NOT here: there is no slot for A or C, "
-        "because neither reached G3 (Kid2 carried only B and D). Each "
-        "grandkid's record still holds exactly two characters — one per "
-        "homolog — identical in shape to Component 1's output. The Rust "
-        "code never stores a joint 6-founder inheritance vector."
-    )
-    text_panel(
-        axes[1, 1],
-        "D. Grandkid letter map + G2→G3 recombination",
-        body_d, cap_d, highlight_spans=highlight_spans,
-    )
-
-    # --- Panel E: truth-vs-deduced ---
-    body_e = [
-        "Truth vs deduced labels (per grandkid, per site):",
-        site_header,
+    # ------------------------------------------------------------------
+    # Figure 5 — truth vs deduced, paternal and maternal on separate rows.
+    # ------------------------------------------------------------------
+    body_5 = [
+        "Figure 5 — Truth vs deduced founder labels",
+        "",
+        "Truth (T) vs deduced (D) founder-letter labels:",
+        "",
     ]
     for g in grandkids:
-        truth_row = "  " + g + "T: " + " ".join(a + b for a, b in truth_labels[g])
-        dedu_row = "  " + g + "D: " + " ".join(
-            paternal_blocks_gk[g][i] + maternal_blocks_gk[g][i] for i in range(NUM_SITES)
-        )
-        body_e.append(truth_row)
-        body_e.append(dedu_row)
-    body_e += [
-        "",
-        f"Total label mismatches: {mismatches} / {NUM_SITES * len(grandkids)}",
-    ]
-    cap_e = (
-        "Panel E. Deduced letters match the simulated truth for all three "
-        "grandkids, including the mid-chromosome B→D recombination in GK3."
-    )
-    text_panel(axes[2, 0], "E. Truth vs deduced", body_e, cap_e)
+        pat_truth = [truth_labels[g][i][0] for i in range(G3_NUM_SITES)]
+        mat_truth = [truth_labels[g][i][1] for i in range(G3_NUM_SITES)]
+        pat_dedu = [paternal_blocks[g][i] for i in range(G3_NUM_SITES)]
+        mat_dedu = [maternal_blocks[g][i] for i in range(G3_NUM_SITES)]
+        body_5.append(f"  {g} p  T:  " + " ".join(pat_truth))
+        body_5.append(f"  {g} p  D:  " + " ".join(pat_dedu))
+        body_5.append(f"  {g} m  T:  " + " ".join(mat_truth))
+        body_5.append(f"  {g} m  D:  " + " ".join(mat_dedu))
+        body_5.append("")
+    body_5.append(f"Total label mismatches: {mismatches} / {total_slots}")
+    _render_panel_image(body_5, tg_dir / "fig5.png")
 
-    # --- Panel F: recursion vs single-shot inheritance vector ---
-    body_f = [
-        "Recursive pass (gtg-ped-map):",
-        "  for ind in family.get_individual_depths():  # ancestor-first",
-        "      for spouse, child in nuclear_unit(ind):",
-        "          marker = unique_allele(parent, spouse)",
-        "          label  = get_iht_markers(parent)  # read parent's letters",
-        "          assign(child, label)              # one slot per homolog",
-        "",
-        "  => Each individual ends with a 2-character label, drawn from",
-        "     {A,B,C,D,E,F}. The same function handles G1->G2 and G2->G3.",
-        "",
-        "Contrast with a Lander-Green-style joint inheritance vector,",
-        "which would encode, per site, a bit for every founder-gamete",
-        "combination across the whole pedigree jointly.  gtg-ped-map does",
-        "NOT do this - it is strictly nuclear-family-local, iterated",
-        "in depth order.",
-    ]
-    cap_f = (
-        "Panel F. Why the G3 pass looks 'recursive' without any explicit "
-        "recursion: track_alleles_through_pedigree (map_builder.rs:295) "
-        "iterates over individuals in ancestor-first depth order. When it "
-        "reaches a G2 parent, that parent already carries resolved letter "
-        "labels from the earlier iteration, and they serve as the 'founder "
-        "labels' for the G2→G3 sub-problem. No joint optimisation over all "
-        "founders is ever performed."
-    )
-    text_panel(axes[2, 1], "F. Recursion vs joint inheritance vector", body_f, cap_f)
-
-    fig.suptitle(
-        "Component 2 — Depth-ordered haplotype mapping into a third generation "
-        "(gtg-ped-map)",
-        fontsize=13, fontweight="bold",
+    # ------------------------------------------------------------------
+    # Markdown narrative.
+    # ------------------------------------------------------------------
+    _emit_component2_markdown(
+        tg_dir / "three_generations.md",
+        kid2_info_sites=kid2_info_sites,
+        spouse_info_sites=spouse_info_sites,
+        g3_num_sites=G3_NUM_SITES,
+        mismatches=mismatches,
+        total_slots=total_slots,
     )
 
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=200)
-    plt.close(fig)
-
-    print(f"[component 2] Wrote {out_path}")
+    print(f"[component 2] Wrote panel PNGs + markdown to {tg_dir}")
     print(f"[component 2] Kid2-informative sites: {kid2_info_sites}")
     print(f"[component 2] Spouse-informative sites: {spouse_info_sites}")
     print(f"[component 2] Grandkid label mismatches vs truth: {mismatches}")
+
+
+def _emit_component2_markdown(
+    out_path: Path,
+    *,
+    kid2_info_sites: List[int],
+    spouse_info_sites: List[int],
+    g3_num_sites: int,
+    mismatches: int,
+    total_slots: int,
+) -> None:
+    """Write the Component-2 narrative that interleaves panel PNGs with
+    prose explanations and Rust-source permalinks.
+    """
+    def link(path: str, line: int) -> str:
+        return permalink(path, line, SHA)
+
+    map_rs = "code/rust/src/bin/map_builder.rs"
+    iht_rs = "code/rust/src/iht.rs"
+    ped_rs = "code/rust/src/ped.rs"
+
+    content = f"""\
+# Extending the same pass to a third generation
+
+This page is part of the [wiki](../index.md) and extends the
+[nuclear-family walkthrough](../nuclear_family/nuclear_family.md) by
+adding an outside marriage to Kid2 and a third-generation sibship. The
+point is that `gtg-ped-map` handles G2→G3 with the **same single loop**
+it used for G1→G2, without ever constructing a joint inheritance vector
+across all founders. All line numbers refer to commit `{SHA[:7]}`. As
+in the nuclear-family page, each function link is followed by its call
+site in the driver — `main()` in
+[`map_builder.rs`]({link(map_rs, 989)}) — so you can step through the
+driver source in parallel with this walkthrough.
+
+The toy simulation adds two things on top of the nuclear-family example:
+
+- Kid2 marries **Spouse**, a fresh founder whose two homologs are
+  labelled **E** and **F** by [`Iht::new`]({link(iht_rs, 172)}) (driver
+  calls at [`map_builder.rs:1059`]({link(map_rs, 1059)}) for the master
+  template and [`map_builder.rs:1111`]({link(map_rs, 1111)}) for each
+  VCF site).
+- The couple has three grandchildren — GK1, GK2, GK3 — over
+  {g3_num_sites} VCF sites, with one maternal crossover in GK3.
+
+Everything below is reproducible by running
+
+```
+python wiki/generate_wiki.py --page three_generations
+```
+
+which regenerates both the figure PNGs referenced here and this
+markdown file itself.
+
+## 1. Pedigree with outside marriage
+
+![Figure 1 — Three-generation pedigree with outside marriage](fig1.png)
+
+Kid2 arrives at this pass already labelled `(B, D)` — the result of the
+G1→G2 informative-site deduction walked through in the nuclear-family
+page. She is not a founder of the three-generation pedigree, but from
+the perspective of the G2→G3 sub-problem she plays exactly the role
+Dad and Mom played in G1→G2: her two homologs are already tagged with
+letters, and those letters are what `gtg-ped-map` will propagate to
+GK1, GK2, GK3.
+
+Spouse, on the other hand, *is* a founder relative to this pedigree
+branch, so [`Iht::new`]({link(iht_rs, 172)}) (called from the driver
+at [`map_builder.rs:1059`]({link(map_rs, 1059)}) and
+[`map_builder.rs:1111`]({link(map_rs, 1111)})) hands him the next
+fresh letter pair `(E, F)`. Nothing about Spouse depends on the G1 pass.
+
+## 2. Unphased VCF rows for the G2→G3 pass
+
+![Figure 2 — Unphased VCF rows for the G2->G3 pass](fig2.png)
+
+These are the only genotype rows the tool sees for the new nuclear
+unit. Kid2's row here is exactly the same row she had in the
+nuclear-family page — but now it is read with Kid2 in the **parent**
+role. That is the key structural point: `gtg-ped-map` does not treat
+G1 and G2 individuals differently; it just iterates over
+(parent, spouse, child) triples in ancestor-first depth order given by
+`family.get_individual_depths()` (see
+[`ped.rs`](https://github.com/{REPO}/blob/{SHA}/{ped_rs})).
+
+## 3. Recursive informative-site deduction
+
+![Figure 3 — Recursive informative-site deduction (G2 -> G3)](fig3.png)
+
+The exact same function,
+[`track_alleles_through_pedigree`]({link(map_rs, 295)}) (driver call at
+[`map_builder.rs:1116`]({link(map_rs, 1116)})), that handled G1→G2 now
+handles G2→G3. For each (parent, spouse) pair it calls
+[`unique_allele`]({link(map_rs, 243)}) (invoked from inside the walk
+at [`map_builder.rs:315`]({link(map_rs, 315)})) to find alleles that
+one partner carries and the other does not:
+
+- **Spouse-informative** (Spouse het × Kid2 hom): the unique paternal
+  allele tags whichever Spouse homolog (`E` or `F`) each grandchild
+  inherited. In this simulation these are sites `{spouse_info_sites}`.
+- **Kid2-informative** (Kid2 het × Spouse hom): symmetric, tagging `B`
+  or `D`. These are sites `{kid2_info_sites}`.
+
+When the walk reaches the Kid2–Spouse pair,
+[`get_iht_markers`]({link(map_rs, 274)}) (called from inside the walk
+at [`map_builder.rs:328`]({link(map_rs, 328)})) reads Kid2's
+already-assigned `(B, D)` letters directly — those labels were written
+during the earlier G1→G2 iteration of the same loop. That is what makes the
+algorithm look recursive across generations even though it is a single
+ancestor-first pass: by the time the loop reaches a G2 parent, her
+letter labels are already finalized and they serve as the "founder
+labels" for the G2→G3 sub-problem. No joint inheritance vector over
+all six founders `{{A, B, C, D, E, F}}` is ever constructed; each
+grandkid ends with exactly two letters — one per homolog — identical
+in shape to the output of the nuclear-family pass.
+
+Figure 3 keeps the same layout as the nuclear-family analogue: the two
+indicator rows (`*` marks informative sites, `_` non-informative ones)
+sit above the grandkid rows, each grandkid's paternal row (`p`) is
+placed directly above its maternal row (`m`), and every column is
+aligned so you can read each letter assignment straight up to the
+indicator that produced it.
+
+## 4. Block collapse and G2→G3 recombination
+
+![Figure 4 — Collapsed blocks with G2->G3 recombination](fig4.png)
+
+The same block-collapse, gap-fill and flip routines invoked for G1→G2 —
+[`collapse_identical_iht`]({link(map_rs, 385)}) (driver call at
+[`map_builder.rs:1191`]({link(map_rs, 1191)})),
+[`fill_missing_values`]({link(map_rs, 617)}) (driver call at
+[`map_builder.rs:1200`]({link(map_rs, 1200)})),
+[`fill_missing_values_by_neighbor`]({link(map_rs, 540)}) (driver call
+at [`map_builder.rs:1201`]({link(map_rs, 1201)})), and
+[`perform_flips_in_place`]({link(map_rs, 702)}) (driver calls at
+[`map_builder.rs:1135`]({link(map_rs, 1135)}),
+[`map_builder.rs:1193`]({link(map_rs, 1193)}), and
+[`map_builder.rs:1203`]({link(map_rs, 1203)})) — run on the G3 trace
+without modification. GK3's `m` row switches `B → D` between sites 3
+and 4, reflecting a crossover in Kid2's gametogenesis, and is emitted
+to `{{prefix}}.recombinants.txt` by
+[`summarize_child_changes`]({link(map_rs, 673)}) (driver call at
+[`map_builder.rs:1228`]({link(map_rs, 1228)})). Note that GK3's
+paternal row is a flat `E` block: this particular crossover is
+maternal, not paternal, because it happened in the meiosis that
+produced GK3's Kid2-derived gamete.
+
+## 5. Truth versus deduced
+
+![Figure 5 — Truth vs deduced founder labels](fig5.png)
+
+For every grandkid the deduced paternal and maternal label streams
+match the ground truth at every site ({mismatches} mismatches out of
+{total_slots} label slots), including GK3's maternal recombination.
+The block map stored for G3 uses only the letters `{{B, D, E, F}}` —
+there is no slot for `A` or `C`, because neither reached G3 (Kid2
+carried only `B` and `D` into this meiosis). As in the nuclear-family
+case, the block map contains only founder letters; the 0/1 allele
+sequence of each haplotype is reconstructed downstream by
+`gtg-concordance`, which will have its own wiki page once migrated.
+"""
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(content)
 
 
 # ---------------------------------------------------------------------------
@@ -1872,10 +1972,11 @@ python wiki/generate_wiki.py
    — the simplest case: two founders and three children, one paternal
    recombinant. Introduces founder-letter labelling, informative-site
    detection, block collapse, and recombination reporting.
-2. *(coming soon)* **Three-generation pedigree with an outside
-   marriage** — shows how the same routine recurses across generations
-   via ancestor-first depth ordering, without ever constructing a
-   joint inheritance vector over all founders.
+2. [Three-generation pedigree with an outside marriage](three_generations/three_generations.md)
+   — extends the nuclear family by marrying Kid2 to a fresh founder
+   (Spouse) and adding a G3 sibship. Shows how the same single loop
+   handles G2→G3 via ancestor-first depth ordering, without ever
+   constructing a joint inheritance vector over all founders.
 3. *(coming soon)* **gtg-concordance phasing at non-informative
    sites** — closes the pipeline by mapping founder letters back to
    VCF alleles, with the "impossible genotype" rule that routes
@@ -1927,9 +2028,7 @@ def main() -> None:
 
     pages = {
         "nuclear_family": lambda: component_1_nuclear_family(args.outdir),
-        "three_generations": lambda: component_2_three_generations(
-            args.outdir / "component2_three_generations.png"
-        ),
+        "three_generations": lambda: component_2_three_generations(args.outdir),
         "concordance": lambda: component_3_concordance(
             args.outdir / "component3_concordance.png"
         ),

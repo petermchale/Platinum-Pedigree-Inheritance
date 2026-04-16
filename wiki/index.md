@@ -28,10 +28,11 @@ python wiki/generate_wiki.py
    — the simplest case: two founders and three children, one paternal
    recombinant. Introduces founder-letter labelling, informative-site
    detection, block collapse, and recombination reporting.
-2. *(coming soon)* **Three-generation pedigree with an outside
-   marriage** — shows how the same routine recurses across generations
-   via ancestor-first depth ordering, without ever constructing a
-   joint inheritance vector over all founders.
+2. [Three-generation pedigree with an outside marriage](three_generations/three_generations.md)
+   — extends the nuclear family by marrying Kid2 to a fresh founder
+   (Spouse) and adding a G3 sibship. Shows how the same single loop
+   handles G2→G3 via ancestor-first depth ordering, without ever
+   constructing a joint inheritance vector over all founders.
 3. *(coming soon)* **gtg-concordance phasing at non-informative
    sites** — closes the pipeline by mapping founder letters back to
    VCF alleles, with the "impossible genotype" rule that routes
