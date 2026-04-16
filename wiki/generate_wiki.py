@@ -194,23 +194,23 @@ def _render_panel_image(
 # child's two haplotype slots. It does NOT reconstruct 0/1 allele sequences —
 # that task is performed later by gtg-concordance (see Component 3).
 
-NUM_SITES = 12
+NUM_SITES = 8
 
 # True founder haplotypes as 0/1 strings over NUM_SITES.
-# Sites 0-2 and 6-8 are dad-informative (dad het, mom hom).
-# Sites 3-5 and 9-11 are mom-informative (mom het, dad hom).
-HAP_A = "010001101010"  # dad's first haplotype
-HAP_B = "101001010010"  # dad's second haplotype
-HAP_C = "000101111101"  # mom's first haplotype
-HAP_D = "000010111010"  # mom's second haplotype
+# Sites 0-1 and 4-5 are dad-informative (dad het, mom hom).
+# Sites 2-3 and 6-7 are mom-informative (mom het, dad hom).
+HAP_A = "10011001"  # dad's first haplotype
+HAP_B = "01010101"  # dad's second haplotype
+HAP_C = "10111001"  # mom's first haplotype
+HAP_D = "10001010"  # mom's second haplotype
 
 # True transmission pattern:
 #   Kid1 inherits (A, C)        — no recombinations
 #   Kid2 inherits (B, D)        — no recombinations
-#   Kid3 inherits (A|B, C)      — paternal recombination between sites 5 and 6
+#   Kid3 inherits (A|B, C)      — paternal recombination between sites 3 and 4
 KID1_LABELS = [("A", "C")] * NUM_SITES
 KID2_LABELS = [("B", "D")] * NUM_SITES
-KID3_LABELS = [("A", "C")] * 6 + [("B", "C")] * 6
+KID3_LABELS = [("A", "C")] * 4 + [("B", "C")] * 4
 
 
 def _hap_to_alleles(hap: str) -> List[int]:
@@ -386,6 +386,8 @@ def component_1_nuclear_family(out_dir: Path) -> None:
     # Panel A — ground-truth founder haplotypes (no title, no site row).
     # ------------------------------------------------------------------
     body_a = [
+        "Figure 1 — Ground-truth founder haplotypes",
+        "",
         "Dad A:  " + " ".join(str(x) for x in sim["dad_a"]),
         "Dad B:  " + " ".join(str(x) for x in sim["dad_b"]),
         "Mom C:  " + " ".join(str(x) for x in sim["mom_c"]),
@@ -394,9 +396,9 @@ def component_1_nuclear_family(out_dir: Path) -> None:
         "True transmission:",
         "  Kid1 <- (A,C)       paternal = A, maternal = C  (no recomb)",
         "  Kid2 <- (B,D)       paternal = B, maternal = D  (no recomb)",
-        "  Kid3 <- (A|B,C)     paternal recomb: A at sites 0-5, B at 6-11",
+        "  Kid3 <- (A|B,C)     paternal recomb: A at sites 0-3, B at 4-7",
     ]
-    _render_panel_image(body_a, nf_dir / "panel_a.png")
+    _render_panel_image(body_a, nf_dir / "fig1.png")
 
     # ------------------------------------------------------------------
     # Panel B — unphased VCF view (no title, no site row).
@@ -405,6 +407,8 @@ def component_1_nuclear_family(out_dir: Path) -> None:
         return g[0] + g[2] if g[0] == g[2] else "01"
 
     body_b = [
+        "Figure 2 — Unphased VCF view",
+        "",
         "Dad :   " + " ".join(_fmt_gt(g) for g in sim["dad_unphased"]),
         "Mom :   " + " ".join(_fmt_gt(g) for g in sim["mom_unphased"]),
         "Kid1:   " + " ".join(_fmt_gt(g) for g in sim["kid1_unphased"]),
@@ -413,25 +417,32 @@ def component_1_nuclear_family(out_dir: Path) -> None:
         "",
         "(0/0 rendered as '00', 0/1 as '01', 1/1 as '11')",
     ]
-    _render_panel_image(body_b, nf_dir / "panel_b.png")
+    _render_panel_image(body_b, nf_dir / "fig2.png")
 
     # ------------------------------------------------------------------
     # Panel C — merged paternal + maternal informative-site deduction.
     # Rows are explicitly labelled "Kid<n> p" / "Kid<n> m".
     # ------------------------------------------------------------------
+    # Align the "* / _" indicator rows with the kid-label columns.
+    # The kid-row prefix "  Kid1 p:    " is 13 characters wide, so pad the
+    # indicator rows with 13 leading spaces so the marks sit directly above
+    # the founder-letter columns of the rows they explain.
+    row_prefix_width = len("  Kid1 p:    ")
+
     def mark_sites(site_list: List[int]) -> str:
         marks = ["_"] * NUM_SITES
         for s in site_list:
             marks[s] = "*"
-        return "           " + " ".join(marks)
+        return (" " * row_prefix_width) + " ".join(marks)
 
     body_c = [
-        mark_sites(dad_info) + "   <- dad-informative (dad het x mom hom)",
-        mark_sites(mom_info) + "   <- mom-informative (mom het x dad hom)",
+        "Figure 3 — Informative-site deduction (paternal and maternal)",
         "",
         "Deduced founder-letter labels at informative sites only",
         "('.' = site not informative for that slot):",
         "",
+        mark_sites(dad_info) + "   <- dad-informative (dad het x mom hom)",
+        mark_sites(mom_info) + "   <- mom-informative (mom het x dad hom)",
     ]
     for k in kids:
         pat_row = f"  {k} p:    " + " ".join(
@@ -444,13 +455,18 @@ def component_1_nuclear_family(out_dir: Path) -> None:
         )
         body_c.append(pat_row)
         body_c.append(mat_row)
-    _render_panel_image(body_c, nf_dir / "panel_c.png")
+    _render_panel_image(body_c, nf_dir / "fig3.png")
 
     # ------------------------------------------------------------------
     # Panel D — collapsed blocks with paternal / maternal on separate
     # rows, highlighting Kid3's A -> B transition.
     # ------------------------------------------------------------------
-    body_d = ["Deduced labels after block collapse and gap-fill:", ""]
+    body_d = [
+        "Figure 4 — Collapsed blocks with recombination",
+        "",
+        "Deduced labels after block collapse and gap-fill:",
+        "",
+    ]
     for k in kids:
         pat_row = f"  {k} p:    " + " ".join(
             paternal_blocks[k][i] for i in range(NUM_SITES)
@@ -462,15 +478,20 @@ def component_1_nuclear_family(out_dir: Path) -> None:
         body_d.append(mat_row)
     body_d += [
         "",
-        "Kid3's paternal row switches A -> B between sites 5 and 6;",
+        "Kid3's paternal row switches A -> B between sites 3 and 4;",
         "this transition is written to {prefix}.recombinants.txt.",
     ]
-    _render_panel_image(body_d, nf_dir / "panel_d.png")
+    _render_panel_image(body_d, nf_dir / "fig4.png")
 
     # ------------------------------------------------------------------
     # Panel E — truth vs deduced, paternal and maternal on separate rows.
     # ------------------------------------------------------------------
-    body_e = ["Truth (T) vs deduced (D) founder-letter labels:", ""]
+    body_e = [
+        "Figure 5 — Truth vs deduced founder labels",
+        "",
+        "Truth (T) vs deduced (D) founder-letter labels:",
+        "",
+    ]
     mismatches = 0
     for k in kids:
         truth = sim["kid_labels"][k]
@@ -490,7 +511,7 @@ def component_1_nuclear_family(out_dir: Path) -> None:
                 mismatches += 1
     total_slots = NUM_SITES * len(kids) * 2
     body_e.append(f"Total label mismatches: {mismatches} / {total_slots}")
-    _render_panel_image(body_e, nf_dir / "panel_e.png")
+    _render_panel_image(body_e, nf_dir / "fig5.png")
 
     # ------------------------------------------------------------------
     # Markdown narrative.
@@ -560,7 +581,7 @@ file itself.
 
 ## 1. Ground truth
 
-![Panel A — Ground-truth founder haplotypes](panel_a.png)
+![Figure 1 — Ground-truth founder haplotypes](fig1.png)
 
 Dad carries two haplotypes, arbitrarily labelled **A** and **B**; mom
 carries **C** and **D**. These letter labels are assigned at startup by
@@ -577,8 +598,8 @@ In this simulation:
 - **Kid1** inherits `(A, C)` with no recombination.
 - **Kid2** inherits `(B, D)` with no recombination.
 - **Kid3** inherits `(A|B, C)` — the paternal slot crosses over between
-  sites 5 and 6, so Kid3 carries dad's `A` haplotype on sites 0–5 and
-  dad's `B` haplotype on sites 6–11.
+  sites 3 and 4, so Kid3 carries dad's `A` haplotype on sites 0–3 and
+  dad's `B` haplotype on sites 4–7.
 
 The goal of `gtg-ped-map` is to recover exactly these letter
 transmissions from the jointly-called VCF alone, without ever looking
@@ -586,7 +607,7 @@ at the underlying 0/1 allele sequence.
 
 ## 2. Unphased VCF input
 
-![Panel B — Unphased VCF view](panel_b.png)
+![Figure 2 — Unphased VCF view](fig2.png)
 
 This is the only genotype information `gtg-ped-map` sees (plus the PED
 file that declares who is whose parent). Two observations matter:
@@ -606,7 +627,7 @@ driver calls `parse_vcf` at [`map_builder.rs:1092`]({link(map_rs, 1092)})).
 
 ## 3. Informative-site detection and letter deduction
 
-![Panel C — Informative-site deduction (paternal and maternal)](panel_c.png)
+![Figure 3 — Informative-site deduction (paternal and maternal)](fig3.png)
 
 For each VCF record,
 [`track_alleles_through_pedigree`]({link(map_rs, 295)}) (driver call at
@@ -633,15 +654,18 @@ which is what makes the method look "recursive" across generations
 while being expressed as a single loop.
 
 Non-informative sites (both parents het, or both hom for the same
-allele) contribute nothing at this stage and are rendered as `.` in the
-panel. Each kid's paternal row (`p`) sits directly above its maternal
-row (`m`), so the two deduction streams line up site-by-site. Kid3's
-`p` row already exhibits the A→B recombination at sites 5/6, even
-though no block collapse has happened yet.
+allele) contribute nothing at this stage and are rendered as `.` in
+Figure 3. The two indicator rows (`*` marks informative sites, `_` marks
+non-informative ones) sit directly above the kid rows, with every
+column aligned, so you can read each letter assignment straight up to
+the indicator that produced it. Each kid's paternal row (`p`) sits
+directly above its maternal row (`m`). Kid3's `p` row already exhibits
+the A→B recombination at sites 3/4, even though no block collapse has
+happened yet.
 
 ## 4. Block collapse and noise filtering
 
-![Panel D — Collapsed blocks with recombination](panel_d.png)
+![Figure 4 — Collapsed blocks with recombination](fig4.png)
 
 Several Rust routines clean the per-site letter trace up before it is
 written to disk:
@@ -660,7 +684,7 @@ written to disk:
    [`map_builder.rs:1200`]({link(map_rs, 1200)})) and
    [`fill_missing_values_by_neighbor`]({link(map_rs, 540)}) (driver
    call at [`map_builder.rs:1201`]({link(map_rs, 1201)})) fill the `.`
-   gaps visible in Panel C from flanking blocks.
+   gaps visible in Figure 3 from flanking blocks.
 3. [`count_matching_neighbors`]({link(map_rs, 935)}) (driver call at
    [`map_builder.rs:1172`]({link(map_rs, 1172)})) and
    [`mask_child_alleles`]({link(map_rs, 970)}) (driver call at
@@ -678,7 +702,7 @@ written to disk:
    [`map_builder.rs:1203`]({link(map_rs, 1203)}).
 
 After these steps, each kid's paternal and maternal slots are fully
-resolved — shown on separate rows per kid in the panel above. Kid3's
+resolved — shown on separate rows per kid in Figure 4. Kid3's
 highlighted A→B transition on the paternal row is emitted to
 `{{prefix}}.recombinants.txt` by
 [`summarize_child_changes`]({link(map_rs, 673)}) (driver call at
@@ -686,7 +710,7 @@ highlighted A→B transition on the paternal row is emitted to
 
 ## 5. Truth versus deduced
 
-![Panel E — Truth vs deduced founder labels](panel_e.png)
+![Figure 5 — Truth vs deduced founder labels](fig5.png)
 
 For every kid the deduced paternal and maternal label streams match the
 ground truth at every site ({mismatches} mismatches out of
