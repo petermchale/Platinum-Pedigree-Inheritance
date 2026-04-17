@@ -385,13 +385,26 @@ def component_1_nuclear_family(out_dir: Path) -> None:
     # ------------------------------------------------------------------
     # Panel A — ground-truth founder haplotypes (no title, no site row).
     # ------------------------------------------------------------------
+    def _kid_pat_row(kid_phased):
+        return " ".join(str(a) for a, _ in kid_phased)
+
+    def _kid_mat_row(kid_phased):
+        return " ".join(str(b) for _, b in kid_phased)
+
     body_a = [
         "Figure 1 — Ground-truth founder haplotypes",
         "",
-        "Dad A:  " + " ".join(str(x) for x in sim["dad_a"]),
-        "Dad B:  " + " ".join(str(x) for x in sim["dad_b"]),
-        "Mom C:  " + " ".join(str(x) for x in sim["mom_c"]),
-        "Mom D:  " + " ".join(str(x) for x in sim["mom_d"]),
+        "Dad  A:  " + " ".join(str(x) for x in sim["dad_a"]),
+        "Dad  B:  " + " ".join(str(x) for x in sim["dad_b"]),
+        "Mom  C:  " + " ".join(str(x) for x in sim["mom_c"]),
+        "Mom  D:  " + " ".join(str(x) for x in sim["mom_d"]),
+        "",
+        "Kid1 pat: " + _kid_pat_row(sim["kid1_phased"]),
+        "Kid1 mat: " + _kid_mat_row(sim["kid1_phased"]),
+        "Kid2 pat: " + _kid_pat_row(sim["kid2_phased"]),
+        "Kid2 mat: " + _kid_mat_row(sim["kid2_phased"]),
+        "Kid3 pat: " + _kid_pat_row(sim["kid3_phased"]),
+        "Kid3 mat: " + _kid_mat_row(sim["kid3_phased"]),
         "",
         "True transmission:",
         "  Kid1 <- (A,C)       paternal = A, maternal = C  (no recomb)",
