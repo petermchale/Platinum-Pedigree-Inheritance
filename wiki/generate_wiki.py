@@ -733,24 +733,25 @@ letters at this stage to emphasise that these names refer to specific
 different: they are *per-site, per-block* algorithm tags. The
 phrase has two stages, both relevant downstream:
 
-- **Per-site** refers to the raw output of `track_alleles_through_pedigree`
-  + `backfill_sibs` described in §3, which runs once per VCF record:
-  every site independently picks which of the parent's two letters
-  goes to which group of kids (the grouping is the partition defined
-  in §3 by the carrier test described there), so the same kid can be
-  tagged `A` at one site and `B` at the next even though it inherited
-  the same physical homolog. Figure 3 makes this visible in Kid2's
-  paternal row.
-- **Per-block** refers to what survives after `perform_flips_in_place`
-  + block collapse in §4, which is what `gtg-ped-map` actually writes
-  to disk: each contiguous block of sites that share the same
-  partition gets one fixed, self-consistent labeling — but the block
-  as a whole can still be flipped `A`↔`B` without losing any
-  structural information, because the two letters in a founder's pair
-  are interchangeable within any single block. That residual
+- **Per-site** refers to the raw per-VCF-record output described in
+  §3: every site independently picks which of the parent's two
+  letters goes to which group of kids (the grouping is the partition
+  defined in §3 by the carrier test described there), so the same
+  kid can be tagged `A` at one site and `B` at the next even though
+  it inherited the same physical homolog. Figure 3 makes this
+  visible in Kid2's paternal row.
+- **Per-block** refers to what survives after the across-site
+  reconciliation described in §4, which is what `gtg-ped-map`
+  actually writes to disk: each contiguous block of sites that share
+  the same partition gets one fixed, self-consistent labeling — but
+  the block as a whole can still be flipped `A`↔`B` without losing
+  any structural information, because the two letters in a founder's
+  pair are interchangeable within any single block. That residual
   per-block freedom is what `gtg-concordance` resolves later by
-  enumerating `2^F` founder-phase orientations and picking the one
-  that best matches the observed alleles.
+  enumerating `2^n` founder-phase orientations (where `n` is the
+  number of founders in the pedigree, i.e. one factor of 2 per
+  founder for the independent A↔B / C↔D / … swap) and picking the
+  one that best matches the observed alleles.
 
 In neither stage are Latin letters pinned to a specific physical
 homolog by `gtg-ped-map` itself, so it is a recurring source of
