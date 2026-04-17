@@ -673,15 +673,31 @@ carries an allele that the spouse does not. Two cases can arise:
 - **Mom-informative** (mom het × dad hom): symmetric, tagging `C` or
   `D`. These are sites `{mom_info}`.
 
-When a child carries the parent's unique allele, the child's paternal
-(or maternal) slot is filled with the parent's letter; otherwise the
-slot is filled with the *other* letter of that parent's pair. Because
-the depth-ordered walk always processes a parent before its children,
-[`get_iht_markers`]({link(map_rs, 274)}) (called from inside the walk
-at [`map_builder.rs:328`]({link(map_rs, 328)})) reads the parent's
-already-assigned letters when propagating to the next generation,
-which is what makes the method look "recursive" across generations
-while being expressed as a single loop.
+When a child carries the parent's unique allele, the child inherited
+the parent's marker-carrying homolog; otherwise the child inherited
+the parent's *other* homolog. So the children are partitioned into
+two groups, and the two letters of the parent's pair are handed out
+one per group: the carriers get one letter, the non-carriers get the
+other. *Which* letter goes to which group is not derivable from the
+genotype data — at startup the parent's `(A, B)` pair was assigned
+arbitrarily with no allele attached, and the algorithm
+([`map_builder.rs:333`]({link(map_rs, 333)})) just picks the first
+letter of the pair (`A` for dad-informative sites, `C` for
+mom-informative sites) for the marker-carriers and the second by
+elimination. The IHT therefore records the *partition* (which kids
+inherited the same parental homolog) reliably, but the identification
+of `A` with one specific physical homolog is a free choice per block
+that downstream code (`perform_flips_in_place`, and ultimately
+`gtg-concordance`'s `2^F`-orientation enumeration) is responsible for
+reconciling. This is what is meant by structural labelling: the IHT
+fixes equivalence classes of inheritance, not letter→allele identity.
+
+Because the depth-ordered walk always processes a parent before its
+children, [`get_iht_markers`]({link(map_rs, 274)}) (called from inside
+the walk at [`map_builder.rs:328`]({link(map_rs, 328)})) reads the
+parent's already-assigned letters when propagating to the next
+generation, which is what makes the method look "recursive" across
+generations while being expressed as a single loop.
 
 Non-informative sites (both parents het, or both hom for the same
 allele) contribute nothing at this stage and are rendered as `.` in
