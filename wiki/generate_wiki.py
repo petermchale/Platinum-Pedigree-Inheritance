@@ -619,8 +619,8 @@ In this simulation:
   dad's `B` haplotype on sites 4–7.
 
 The goal of `gtg-ped-map` is to recover exactly these letter
-transmissions from the jointly-called VCF alone, without ever looking
-at the underlying 0/1 allele sequence.
+transmissions from the jointly-called *unphased* VCF alone (see §2),
+without ever looking at the underlying 0/1 allele sequence.
 
 ## 2. Unphased VCF input
 
