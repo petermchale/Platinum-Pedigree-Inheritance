@@ -719,6 +719,12 @@ file itself.
 
 ![Figure 1 — Ground-truth founder haplotypes](fig1.png)
 
+Each column of Figure 1 corresponds to one biallelic SNV, and each
+`0`/`1` entry is the allele carried by that homolog at that site:
+`0` is the reference (REF) allele as recorded in the VCF, `1` is the
+alternate (ALT) allele. (Indels and multi-allelic sites are filtered
+out before this stage; see §2.)
+
 Dad carries two physical homologs, named **α** and **β** here purely as
 labels for the figure; mom carries **γ** and **δ**. We use Greek
 letters at this stage to emphasise that these names refer to specific
