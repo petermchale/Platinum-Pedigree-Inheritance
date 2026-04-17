@@ -730,10 +730,11 @@ phrase has two stages, both relevant downstream:
 - **Per-site** refers to the raw output of `track_alleles_through_pedigree`
   + `backfill_sibs` described in §3, which runs once per VCF record:
   every site independently picks which of the parent's two letters
-  goes to the carrier group (always the *first* letter of the pair),
-  so the same kid can be tagged `A` at one site and `B` at the next
-  even though it inherited the same physical homolog. Figure 3 makes
-  this visible in Kid2's paternal row.
+  goes to which group of kids (the grouping is the partition defined
+  in §3 by the carrier test described there), so the same kid can be
+  tagged `A` at one site and `B` at the next even though it inherited
+  the same physical homolog. Figure 3 makes this visible in Kid2's
+  paternal row.
 - **Per-block** refers to what survives after `perform_flips_in_place`
   + block collapse in §4, which is what `gtg-ped-map` actually writes
   to disk: each contiguous block of sites that share the same
