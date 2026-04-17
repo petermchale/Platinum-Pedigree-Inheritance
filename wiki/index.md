@@ -51,8 +51,8 @@ python wiki/generate_wiki.py
 - **Filenames describe content, not sequence.** Reading order is
   defined above; subdirectories use short descriptive names
   (`nuclear_family/`) instead of numeric prefixes.
-- **Panels live next to the page that references them.** Each
-  walkthrough subdirectory holds the markdown plus its PNG panels, so
+- **Figures live next to the page that references them.** Each
+  walkthrough subdirectory holds the markdown plus its PNG figures, so
   a page is self-contained and can be moved or renamed as a unit.
 - **Rust permalinks are pinned to a commit SHA.** Regenerating the
   wiki refreshes every permalink to the current `HEAD`.

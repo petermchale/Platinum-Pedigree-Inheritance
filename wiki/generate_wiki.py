@@ -560,7 +560,7 @@ This page is part of the [wiki](../index.md) and walks through
 pedigree: a two-generation nuclear family with two founders (dad and
 mom) and three children. It complements the full
 [`methods.md`](../methods.md) write-up by zooming in on the per-site
-mechanics and pinning each panel to the exact Rust code that implements
+mechanics and pinning each figure to the exact Rust code that implements
 it. All line numbers refer to commit `{SHA[:7]}`. Each function link is
 followed by its call site in the driver — `main()` in
 [`map_builder.rs`]({link(map_rs, 989)}) for `gtg-ped-map`, and `main()` in
@@ -576,7 +576,7 @@ priori. Everything below is reproducible by running
 python wiki/generate_wiki.py --page nuclear_family
 ```
 
-which regenerates both the panel PNGs referenced here and this markdown
+which regenerates both the figure PNGs referenced here and this markdown
 file itself.
 
 ## 1. Ground truth
@@ -2448,8 +2448,8 @@ python wiki/generate_wiki.py
 - **Filenames describe content, not sequence.** Reading order is
   defined above; subdirectories use short descriptive names
   (`nuclear_family/`) instead of numeric prefixes.
-- **Panels live next to the page that references them.** Each
-  walkthrough subdirectory holds the markdown plus its PNG panels, so
+- **Figures live next to the page that references them.** Each
+  walkthrough subdirectory holds the markdown plus its PNG figures, so
   a page is self-contained and can be moved or renamed as a unit.
 - **Rust permalinks are pinned to a commit SHA.** Regenerating the
   wiki refreshes every permalink to the current `HEAD`.
