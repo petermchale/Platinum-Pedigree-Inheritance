@@ -674,17 +674,18 @@ carries an allele that the spouse does not. Two cases can arise:
   `D`. These are sites `{mom_info}`.
 
 When a child carries the parent's unique allele, the child inherited
-the parent's marker-carrying homolog; otherwise the child inherited
-the parent's *other* homolog. So the children are partitioned into
-two groups, and the two letters of the parent's pair are handed out
-one per group: the carriers get one letter, the non-carriers get the
-other. *Which* letter goes to which group is not derivable from the
-genotype data — at startup the parent's `(A, B)` pair was assigned
-arbitrarily with no allele attached, and the algorithm
+the parent homolog that carries the unique allele; otherwise the
+child inherited the parent's *other* homolog. So the children are
+partitioned into two groups, and the two letters of the parent's pair
+are handed out one per group: the children carrying the unique allele
+get one letter, the children without it get the other. *Which* letter
+goes to which group is not derivable from the genotype data — at
+startup the parent's `(A, B)` pair was assigned arbitrarily with no
+allele attached, and the algorithm
 ([`map_builder.rs:333`]({link(map_rs, 333)})) just picks the first
 letter of the pair (`A` for dad-informative sites, `C` for
-mom-informative sites) for the marker-carriers and the second by
-elimination. The IHT therefore records the *partition* (which kids
+mom-informative sites) for the children carrying the unique allele
+and the second by elimination. The IHT therefore records the *partition* (which kids
 inherited the same parental homolog) reliably, but the identification
 of `A` with one specific physical homolog is a free choice per block
 that downstream code (`perform_flips_in_place`, and ultimately
