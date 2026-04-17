@@ -22,7 +22,7 @@ import argparse
 import subprocess
 import textwrap
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
@@ -194,38 +194,56 @@ def _render_panel_image(
 # child's two haplotype slots. It does NOT reconstruct 0/1 allele sequences —
 # that task is performed later by gtg-concordance (see Component 3).
 
-NUM_SITES = 8
+NUM_SITES = 9
 
-# True founder haplotypes as 0/1 strings over NUM_SITES.
-# Sites 0-1 and 4-5 are dad-informative (dad het, mom hom).
-# Sites 2-3 and 6-7 are mom-informative (mom het, dad hom).
-HAP_A = "10011001"  # dad's first haplotype
-HAP_B = "01010101"  # dad's second haplotype
-HAP_C = "10111001"  # mom's first haplotype
-HAP_D = "10001010"  # mom's second haplotype
+# Parent haplotypes are labelled with Greek letters (alpha/beta for dad,
+# gamma/delta for mom) to make clear that these are *physical homolog
+# identities*, NOT the per-site Latin labels (A/B/C/D) that gtg-ped-map
+# assigns later. The whole point of the wiki page is that A/B are
+# per-site, per-block algorithm labels with no fixed correspondence to
+# any specific physical homolog.
+#
+# Sites 0,1,4,5,8: dad-informative (dad het, mom hom)
+# Sites 2,3,6,7:   mom-informative (mom het, dad hom)
+# Site 8 is dad-informative AND has Kid1's genotype missing in the VCF;
+# this is the case backfill_sibs handles by sibling elimination.
+HAP_DAD_ALPHA = "100110010"
+HAP_DAD_BETA  = "010101011"
+HAP_MOM_GAMMA = "101110010"
+HAP_MOM_DELTA = "100010100"
 
-# True transmission pattern:
-#   Kid1 inherits (A, C)        — no recombinations
-#   Kid2 inherits (B, D)        — no recombinations
-#   Kid3 inherits (A|B, C)      — paternal recombination between sites 3 and 4
-KID1_LABELS = [("A", "C")] * NUM_SITES
-KID2_LABELS = [("B", "D")] * NUM_SITES
-KID3_LABELS = [("A", "C")] * 4 + [("B", "C")] * 4
+# True transmission pattern (Greek = physical homolog identity):
+#   Kid1: (alpha, gamma) at every site            — no recombinations
+#   Kid2: (beta,  delta) at every site            — no recombinations
+#   Kid3: (alpha, gamma) at sites 0-3,            — paternal recombination
+#         (beta,  gamma) at sites 4-8               between sites 3 and 4
+KID1_LABELS = [("α", "γ")] * NUM_SITES
+KID2_LABELS = [("β", "δ")] * NUM_SITES
+KID3_LABELS = [("α", "γ")] * 4 + [("β", "γ")] * 5
+
+# Sites with missing genotypes in the simulated VCF (rendered as ./.).
+# At site 8, Kid1's genotype is missing — track_alleles_through_pedigree
+# cannot tag Kid1, but backfill_sibs recovers its letter from siblings.
+KID_MISSING = {"Kid1": {8}, "Kid2": set(), "Kid3": set()}
 
 
 def _hap_to_alleles(hap: str) -> List[int]:
     return [int(c) for c in hap]
 
 
+_GREEK_TO_HAP = {
+    "α": HAP_DAD_ALPHA,
+    "β": HAP_DAD_BETA,
+    "γ": HAP_MOM_GAMMA,
+    "δ": HAP_MOM_DELTA,
+}
+
+
 def _child_genotype(
     dad_label: str, mom_label: str, site: int
 ) -> Tuple[int, int]:
-    paternal = _hap_to_alleles(
-        {"A": HAP_A, "B": HAP_B}[dad_label]
-    )[site]
-    maternal = _hap_to_alleles(
-        {"C": HAP_C, "D": HAP_D}[mom_label]
-    )[site]
+    paternal = _hap_to_alleles(_GREEK_TO_HAP[dad_label])[site]
+    maternal = _hap_to_alleles(_GREEK_TO_HAP[mom_label])[site]
     return paternal, maternal
 
 
@@ -236,10 +254,10 @@ def _unphased_gt(a: int, b: int) -> str:
 
 
 def _build_simulation() -> Dict:
-    dad_hap_a = _hap_to_alleles(HAP_A)
-    dad_hap_b = _hap_to_alleles(HAP_B)
-    mom_hap_c = _hap_to_alleles(HAP_C)
-    mom_hap_d = _hap_to_alleles(HAP_D)
+    dad_alpha = _hap_to_alleles(HAP_DAD_ALPHA)
+    dad_beta = _hap_to_alleles(HAP_DAD_BETA)
+    mom_gamma = _hap_to_alleles(HAP_MOM_GAMMA)
+    mom_delta = _hap_to_alleles(HAP_MOM_DELTA)
 
     def gts(labels):
         return [_child_genotype(la, lb, i) for i, (la, lb) in enumerate(labels)]
@@ -251,16 +269,25 @@ def _build_simulation() -> Dict:
     def unphased_row(hap1, hap2):
         return [_unphased_gt(hap1[i], hap2[i]) for i in range(NUM_SITES)]
 
+    def kid_unphased(kid_name, phased):
+        out = []
+        for i, (a, b) in enumerate(phased):
+            if i in KID_MISSING[kid_name]:
+                out.append("./.")
+            else:
+                out.append(_unphased_gt(a, b))
+        return out
+
     return {
-        "dad_unphased": unphased_row(dad_hap_a, dad_hap_b),
-        "mom_unphased": unphased_row(mom_hap_c, mom_hap_d),
-        "kid1_unphased": [_unphased_gt(a, b) for a, b in kid1_phased],
-        "kid2_unphased": [_unphased_gt(a, b) for a, b in kid2_phased],
-        "kid3_unphased": [_unphased_gt(a, b) for a, b in kid3_phased],
-        "dad_a": dad_hap_a,
-        "dad_b": dad_hap_b,
-        "mom_c": mom_hap_c,
-        "mom_d": mom_hap_d,
+        "dad_unphased": unphased_row(dad_alpha, dad_beta),
+        "mom_unphased": unphased_row(mom_gamma, mom_delta),
+        "kid1_unphased": kid_unphased("Kid1", kid1_phased),
+        "kid2_unphased": kid_unphased("Kid2", kid2_phased),
+        "kid3_unphased": kid_unphased("Kid3", kid3_phased),
+        "dad_alpha": dad_alpha,
+        "dad_beta": dad_beta,
+        "mom_gamma": mom_gamma,
+        "mom_delta": mom_delta,
         "kid1_phased": kid1_phased,
         "kid2_phased": kid2_phased,
         "kid3_phased": kid3_phased,
@@ -274,12 +301,12 @@ def _build_simulation() -> Dict:
 
 def _informative_sites_dad(sim: Dict) -> List[int]:
     """Sites where dad is het and mom is homozygous — the allele unique to
-    dad labels whichever paternal haplotype (A or B) each kid carries.
+    dad labels whichever paternal homolog each kid carries.
     Mirrors unique_allele at map_builder.rs:243."""
     sites = []
     for i in range(NUM_SITES):
-        dad_het = sim["dad_a"][i] != sim["dad_b"][i]
-        mom_hom = sim["mom_c"][i] == sim["mom_d"][i]
+        dad_het = sim["dad_alpha"][i] != sim["dad_beta"][i]
+        mom_hom = sim["mom_gamma"][i] == sim["mom_delta"][i]
         if dad_het and mom_hom:
             sites.append(i)
     return sites
@@ -288,54 +315,129 @@ def _informative_sites_dad(sim: Dict) -> List[int]:
 def _informative_sites_mom(sim: Dict) -> List[int]:
     sites = []
     for i in range(NUM_SITES):
-        mom_het = sim["mom_c"][i] != sim["mom_d"][i]
-        dad_hom = sim["dad_a"][i] == sim["dad_b"][i]
+        mom_het = sim["mom_gamma"][i] != sim["mom_delta"][i]
+        dad_hom = sim["dad_alpha"][i] == sim["dad_beta"][i]
         if mom_het and dad_hom:
             sites.append(i)
     return sites
 
 
-def _dad_label_for_kid_at_site(sim: Dict, kid: str, site: int) -> str:
-    """At a dad-informative site, deduce whether the kid carries A or B."""
-    # dad's unique allele is the allele in dad that isn't in mom.
-    dad_alleles = {sim["dad_a"][site], sim["dad_b"][site]}
-    mom_alleles = {sim["mom_c"][site], sim["mom_d"][site]}
-    unique = list(dad_alleles - mom_alleles)
-    if not unique:
-        return "?"
-    unique = unique[0]
-    # Which dad haplotype (A or B) carries this unique allele?
-    if sim["dad_a"][site] == unique:
-        carrier_label = "A"
-    else:
-        carrier_label = "B"
-    # Does the kid carry the unique allele?
-    kid_gt_key = {"Kid1": "kid1_unphased", "Kid2": "kid2_unphased", "Kid3": "kid3_unphased"}[kid]
-    gt = sim[kid_gt_key][site]
-    kid_alleles = {int(gt[0]), int(gt[2])}
-    if unique in kid_alleles:
-        return carrier_label
-    # Kid carries the *other* dad haplotype.
-    return "B" if carrier_label == "A" else "A"
+def _per_site_parent_labels(
+    sim: Dict,
+    info_sites: List[int],
+    parent_hap_a_key: str,
+    parent_hap_b_key: str,
+    other_hap_a_key: str,
+    other_hap_b_key: str,
+    kid_unphased_key: Dict[str, str],
+    letter_first: str,
+    letter_second: str,
+    slot: str,  # "p" or "m"
+) -> Dict[str, List[str]]:
+    """Faithfully simulate, per informative site, what
+    track_alleles_through_pedigree (carriers tagged with letter_first)
+    plus backfill_sibs (non-carriers get letter_second; swap-by-majority
+    if needed) would write to each kid's slot.
+
+    Returns {kid: [label_or_'?'] * NUM_SITES} where '?' means the site is
+    not informative for this slot.
+    """
+    kids = ["Kid1", "Kid2", "Kid3"]
+    out: Dict[str, List[str]] = {k: ["?"] * NUM_SITES for k in kids}
+
+    for s in info_sites:
+        parent_alleles = {sim[parent_hap_a_key][s], sim[parent_hap_b_key][s]}
+        other_alleles = {sim[other_hap_a_key][s], sim[other_hap_b_key][s]}
+        unique_set = parent_alleles - other_alleles
+        if not unique_set:
+            continue
+        unique = next(iter(unique_set))
+
+        # Step 1 (track_alleles_through_pedigree): tag carriers with
+        # letter_first. Missing-genotype kids stay untagged.
+        per_kid: Dict[str, str] = {}
+        for k in kids:
+            gt = sim[kid_unphased_key[k]][s]
+            if gt == "./.":
+                per_kid[k] = "?"
+                continue
+            kid_alleles = {int(gt[0]), int(gt[2])}
+            per_kid[k] = letter_first if unique in kid_alleles else "?"
+
+        # Step 2 (backfill_sibs): if at least one carrier was tagged,
+        # assign letter_second to every other (non-missing) sibling.
+        any_carrier = any(per_kid[k] == letter_first for k in kids)
+        if any_carrier:
+            # Backfill: untagged sibs (whether non-carrier or missing)
+            # get letter_second, deducing the missing kid by elimination.
+            for k in kids:
+                if per_kid[k] == "?":
+                    per_kid[k] = letter_second
+
+        # Step 3 (backfill swap-by-majority, map_builder.rs:881-905):
+        # if letter_first appears fewer times than letter_second across
+        # children, swap them so the majority class carries letter_first.
+        first_count = sum(1 for k in kids if per_kid[k] == letter_first)
+        second_count = sum(1 for k in kids if per_kid[k] == letter_second)
+        if first_count < second_count:
+            for k in kids:
+                if per_kid[k] == letter_first:
+                    per_kid[k] = letter_second
+                elif per_kid[k] == letter_second:
+                    per_kid[k] = letter_first
+
+        for k in kids:
+            out[k][s] = per_kid[k]
+
+    return out
 
 
-def _mom_label_for_kid_at_site(sim: Dict, kid: str, site: int) -> str:
-    mom_alleles = {sim["mom_c"][site], sim["mom_d"][site]}
-    dad_alleles = {sim["dad_a"][site], sim["dad_b"][site]}
-    unique = list(mom_alleles - dad_alleles)
-    if not unique:
-        return "?"
-    unique = unique[0]
-    if sim["mom_c"][site] == unique:
-        carrier_label = "C"
-    else:
-        carrier_label = "D"
-    kid_gt_key = {"Kid1": "kid1_unphased", "Kid2": "kid2_unphased", "Kid3": "kid3_unphased"}[kid]
-    gt = sim[kid_gt_key][site]
-    kid_alleles = {int(gt[0]), int(gt[2])}
-    if unique in kid_alleles:
-        return carrier_label
-    return "D" if carrier_label == "C" else "C"
+def _flip_blocks(
+    per_site: Dict[str, List[str]],
+    info_sites: List[int],
+    letters: Tuple[str, str],
+) -> Dict[str, List[str]]:
+    """Mimic perform_flips_in_place: walk informative sites left to right
+    and, whenever the next site's labels would agree better with the
+    running labels under an A<->B swap, flip them. Then propagate each
+    site's labels forward and backward to fill non-informative gaps
+    (mimicking gap-fill / collapse).
+    """
+    kids = list(per_site.keys())
+    out: Dict[str, List[str]] = {k: ["?"] * NUM_SITES for k in kids}
+    a, b = letters
+    prev: Optional[Dict[str, str]] = None
+
+    for s in info_sites:
+        cur = {k: per_site[k][s] for k in kids}
+        if prev is not None:
+            flipped = {
+                k: (b if cur[k] == a else a if cur[k] == b else cur[k])
+                for k in kids
+            }
+            same = sum(1 for k in kids if cur[k] == prev[k])
+            flip = sum(1 for k in kids if flipped[k] == prev[k])
+            if flip > same:
+                cur = flipped
+        for k in kids:
+            out[k][s] = cur[k]
+        prev = cur
+
+    for k in kids:
+        last = "?"
+        for i in range(NUM_SITES):
+            if out[k][i] != "?":
+                last = out[k][i]
+            else:
+                out[k][i] = last
+        last = "?"
+        for i in range(NUM_SITES - 1, -1, -1):
+            if out[k][i] != "?":
+                last = out[k][i]
+            else:
+                out[k][i] = last
+
+    return out
 
 
 def component_1_nuclear_family(out_dir: Path) -> None:
@@ -351,33 +453,29 @@ def component_1_nuclear_family(out_dir: Path) -> None:
     mom_info = _informative_sites_mom(sim)
 
     kids = ["Kid1", "Kid2", "Kid3"]
-    paternal_deduced: Dict[str, List[str]] = {k: ["?"] * NUM_SITES for k in kids}
-    maternal_deduced: Dict[str, List[str]] = {k: ["?"] * NUM_SITES for k in kids}
-    for s in dad_info:
-        for k in kids:
-            paternal_deduced[k][s] = _dad_label_for_kid_at_site(sim, k, s)
-    for s in mom_info:
-        for k in kids:
-            maternal_deduced[k][s] = _mom_label_for_kid_at_site(sim, k, s)
+    kid_unphased_key = {
+        "Kid1": "kid1_unphased",
+        "Kid2": "kid2_unphased",
+        "Kid3": "kid3_unphased",
+    }
 
-    def carry_forward(labels: List[str]) -> List[str]:
-        out = list(labels)
-        last = "?"
-        for i in range(NUM_SITES):
-            if out[i] != "?":
-                last = out[i]
-            else:
-                out[i] = last
-        last = "?"
-        for i in range(NUM_SITES - 1, -1, -1):
-            if out[i] != "?":
-                last = out[i]
-            else:
-                out[i] = last
-        return out
+    paternal_deduced = _per_site_parent_labels(
+        sim, dad_info,
+        parent_hap_a_key="dad_alpha", parent_hap_b_key="dad_beta",
+        other_hap_a_key="mom_gamma", other_hap_b_key="mom_delta",
+        kid_unphased_key=kid_unphased_key,
+        letter_first="A", letter_second="B", slot="p",
+    )
+    maternal_deduced = _per_site_parent_labels(
+        sim, mom_info,
+        parent_hap_a_key="mom_gamma", parent_hap_b_key="mom_delta",
+        other_hap_a_key="dad_alpha", other_hap_b_key="dad_beta",
+        kid_unphased_key=kid_unphased_key,
+        letter_first="C", letter_second="D", slot="m",
+    )
 
-    paternal_blocks = {k: carry_forward(paternal_deduced[k]) for k in kids}
-    maternal_blocks = {k: carry_forward(maternal_deduced[k]) for k in kids}
+    paternal_blocks = _flip_blocks(paternal_deduced, dad_info, ("A", "B"))
+    maternal_blocks = _flip_blocks(maternal_deduced, mom_info, ("C", "D"))
 
     nf_dir = out_dir / "nuclear_family"
     nf_dir.mkdir(parents=True, exist_ok=True)
@@ -394,10 +492,10 @@ def component_1_nuclear_family(out_dir: Path) -> None:
     body_a = [
         "Figure 1 — Ground-truth founder haplotypes",
         "",
-        "Dad  A:  " + " ".join(str(x) for x in sim["dad_a"]),
-        "Dad  B:  " + " ".join(str(x) for x in sim["dad_b"]),
-        "Mom  C:  " + " ".join(str(x) for x in sim["mom_c"]),
-        "Mom  D:  " + " ".join(str(x) for x in sim["mom_d"]),
+        "Dad  α:  " + " ".join(str(x) for x in sim["dad_alpha"]),
+        "Dad  β:  " + " ".join(str(x) for x in sim["dad_beta"]),
+        "Mom  γ:  " + " ".join(str(x) for x in sim["mom_gamma"]),
+        "Mom  δ:  " + " ".join(str(x) for x in sim["mom_delta"]),
         "",
         "Kid1 p:  " + _kid_pat_row(sim["kid1_phased"]),
         "Kid1 m:  " + _kid_mat_row(sim["kid1_phased"]),
@@ -406,10 +504,10 @@ def component_1_nuclear_family(out_dir: Path) -> None:
         "Kid3 p:  " + _kid_pat_row(sim["kid3_phased"]),
         "Kid3 m:  " + _kid_mat_row(sim["kid3_phased"]),
         "",
-        "True transmission:",
-        "  Kid1 <- (A,C)       paternal = A, maternal = C  (no recomb)",
-        "  Kid2 <- (B,D)       paternal = B, maternal = D  (no recomb)",
-        "  Kid3 <- (A|B,C)     paternal recomb: A at sites 0-3, B at 4-7",
+        "True transmission (Greek = physical homolog identity):",
+        "  Kid1 <- (α, γ)        no recombination",
+        "  Kid2 <- (β, δ)        no recombination",
+        "  Kid3 <- (α|β, γ)      paternal recomb: α at sites 0-3, β at 4-8",
     ]
     _render_panel_image(body_a, nf_dir / "fig1.png")
 
@@ -417,6 +515,8 @@ def component_1_nuclear_family(out_dir: Path) -> None:
     # Panel B — unphased VCF view (no title, no site row).
     # ------------------------------------------------------------------
     def _fmt_gt(g: str) -> str:
+        if g == "./.":
+            return ".."
         return g[0] + g[2] if g[0] == g[2] else "01"
 
     body_b = [
@@ -428,7 +528,7 @@ def component_1_nuclear_family(out_dir: Path) -> None:
         "Kid2:   " + " ".join(_fmt_gt(g) for g in sim["kid2_unphased"]),
         "Kid3:   " + " ".join(_fmt_gt(g) for g in sim["kid3_unphased"]),
         "",
-        "(0/0 rendered as '00', 0/1 as '01', 1/1 as '11')",
+        "(0/0 rendered as '00', 0/1 as '01', 1/1 as '11', ./. as '..')",
     ]
     _render_panel_image(body_b, nf_dir / "fig2.png")
 
@@ -477,7 +577,7 @@ def component_1_nuclear_family(out_dir: Path) -> None:
     body_d = [
         "Figure 4 — Collapsed blocks with recombination",
         "",
-        "Deduced labels after block collapse and gap-fill:",
+        "Deduced labels after perform_flips_in_place + collapse + gap-fill:",
         "",
     ]
     for k in kids:
@@ -499,10 +599,24 @@ def component_1_nuclear_family(out_dir: Path) -> None:
     # ------------------------------------------------------------------
     # Panel E — truth vs deduced, paternal and maternal on separate rows.
     # ------------------------------------------------------------------
+    def partition_match(truth_at_site: List[str], dedu_at_site: List[str]) -> bool:
+        """Two labelings agree as partitions iff for every kid pair, truth
+        and deduced agree on whether the two kids share a homolog."""
+        n = len(truth_at_site)
+        for i in range(n):
+            for j in range(i + 1, n):
+                t_eq = truth_at_site[i] == truth_at_site[j]
+                d_eq = dedu_at_site[i] == dedu_at_site[j]
+                if t_eq != d_eq:
+                    return False
+        return True
+
     body_e = [
         "Figure 5 — Truth vs deduced founder labels",
         "",
-        "Truth (T) vs deduced (D) founder-letter labels:",
+        "Truth uses Greek (physical homologs); deduced uses Latin",
+        "(per-block algorithm letters). They match if they induce the",
+        "same partition of kids per site.",
         "",
     ]
     mismatches = 0
@@ -517,13 +631,22 @@ def component_1_nuclear_family(out_dir: Path) -> None:
         body_e.append(f"  {k} m  T:  " + " ".join(mat_truth))
         body_e.append(f"  {k} m  D:  " + " ".join(mat_dedu))
         body_e.append("")
-        for i in range(NUM_SITES):
-            if pat_truth[i] != pat_dedu[i]:
-                mismatches += 1
-            if mat_truth[i] != mat_dedu[i]:
-                mismatches += 1
-    total_slots = NUM_SITES * len(kids) * 2
-    body_e.append(f"Total label mismatches: {mismatches} / {total_slots}")
+
+    # Partition mismatches: per site, per slot, across all 3 kids.
+    for i in range(NUM_SITES):
+        pat_truth_site = [sim["kid_labels"][k][i][0] for k in kids]
+        pat_dedu_site = [paternal_blocks[k][i] for k in kids]
+        mat_truth_site = [sim["kid_labels"][k][i][1] for k in kids]
+        mat_dedu_site = [maternal_blocks[k][i] for k in kids]
+        if not partition_match(pat_truth_site, pat_dedu_site):
+            mismatches += 1
+        if not partition_match(mat_truth_site, mat_dedu_site):
+            mismatches += 1
+    total_partitions = NUM_SITES * 2  # paternal + maternal slot per site
+    body_e.append(
+        f"Partition mismatches (paternal+maternal per site): "
+        f"{mismatches} / {total_partitions}"
+    )
     _render_panel_image(body_e, nf_dir / "fig5.png")
 
     # ------------------------------------------------------------------
@@ -534,13 +657,13 @@ def component_1_nuclear_family(out_dir: Path) -> None:
         dad_info=dad_info,
         mom_info=mom_info,
         mismatches=mismatches,
-        total_slots=total_slots,
+        total_partitions=total_partitions,
     )
 
     print(f"[component 1] Wrote panel PNGs + markdown to {nf_dir}")
     print(f"[component 1] Dad-informative sites: {dad_info}")
     print(f"[component 1] Mom-informative sites: {mom_info}")
-    print(f"[component 1] Label mismatches vs truth: {mismatches}")
+    print(f"[component 1] Partition mismatches vs truth: {mismatches}")
     print(
         f"[component 1] Permalink example: "
         f"{permalink('code/rust/src/bin/map_builder.rs', 295, SHA)}"
@@ -553,7 +676,7 @@ def _emit_component1_markdown(
     dad_info: List[int],
     mom_info: List[int],
     mismatches: int,
-    total_slots: int,
+    total_partitions: int,
 ) -> None:
     """Write the Component-1 narrative that interleaves panel PNGs with
     prose explanations and Rust-source permalinks.
@@ -596,23 +719,36 @@ file itself.
 
 ![Figure 1 — Ground-truth founder haplotypes](fig1.png)
 
-Dad carries two haplotypes, arbitrarily labelled **A** and **B**; mom
-carries **C** and **D**. These letter labels are assigned at startup by
-[`Iht::new`]({link(iht_rs, 172)}) (driver calls at
-[`map_builder.rs:1059`]({link(map_rs, 1059)}) for the master template
-and [`map_builder.rs:1111`]({link(map_rs, 1111)}) for each VCF site),
-which hands each founder a fresh pair of capital letters — `(A,B)`,
-`(C,D)`, `(E,F)`, … — *without* associating any allele sequence with
-them. The letters are pure structural placeholders whose only job is
-to be carried from founders to descendants.
+Dad carries two physical homologs, named **α** and **β** here purely as
+labels for the figure; mom carries **γ** and **δ**. We use Greek
+letters at this stage to emphasise that these names refer to specific
+*physical homologs* in the founders' cells. The Latin labels (`A`,
+`B`, `C`, `D`) that `gtg-ped-map` eventually writes are something
+different: they are *per-site, per-block* algorithm tags whose
+correspondence to a particular physical homolog is not fixed until
+downstream reconciliation (see §3 and §4). It is a recurring source of
+confusion to read `A` as a fixed name for dad's first physical
+homolog; it is not.
 
-The two `Iht::new` calls play different roles. The first
-([`map_builder.rs:1059`]({link(map_rs, 1059)})) builds a **master
-template** that is never mutated — only its
+In this simulation:
+
+- **Kid1** inherits `(α, γ)` with no recombination.
+- **Kid2** inherits `(β, δ)` with no recombination.
+- **Kid3** inherits `(α|β, γ)` — the paternal slot crosses over between
+  sites 3 and 4, so Kid3 carries dad's `α` homolog on sites 0–3 and
+  dad's `β` homolog on sites 4–8.
+
+At program startup, [`Iht::new`]({link(iht_rs, 172)}) (driver calls at
+[`map_builder.rs:1059`]({link(map_rs, 1059)}) for the master template
+and [`map_builder.rs:1111`]({link(map_rs, 1111)}) for each VCF site)
+hands each founder a fresh pair of Latin letters — `(A,B)`, `(C,D)`,
+`(E,F)`, … — *without* associating any allele or any physical homolog
+with them. The letters are pure structural placeholders. The two
+`Iht::new` call sites play different roles: the first builds a
+**master template** that is never mutated — only its
 [`legend()`]({link(iht_rs, 330)}) is read, to print the column header
 (`Dad:A|B Mom:C|D Kid1:?|? …`) at the top of the output files. The
-second ([`map_builder.rs:1111`]({link(map_rs, 1111)})) allocates a
-fresh `local_iht` per VCF record that
+second allocates a fresh `local_iht` per VCF record that
 [`track_alleles_through_pedigree`]({link(map_rs, 295)}) then *mutates*
 in place to record which founder letter each child inherited at that
 site. A per-site copy is needed rather than reusing the master because
@@ -623,17 +759,11 @@ actual zygosity (autosome vs. chrX, decided at
 [`map_builder.rs:1086`]({link(map_rs, 1086)})), which changes how
 letters are laid out for males on chrX.
 
-In this simulation:
-
-- **Kid1** inherits `(A, C)` with no recombination.
-- **Kid2** inherits `(B, D)` with no recombination.
-- **Kid3** inherits `(A|B, C)` — the paternal slot crosses over between
-  sites 3 and 4, so Kid3 carries dad's `A` haplotype on sites 0–3 and
-  dad's `B` haplotype on sites 4–7.
-
-The goal of `gtg-ped-map` is to recover exactly these letter
-transmissions from the jointly-called *unphased* VCF alone (see §2),
-without ever looking at the underlying 0/1 allele sequence.
+The goal of `gtg-ped-map` is to recover exactly the Greek-labelled
+transmissions above — but expressed in Latin letters and only as
+*partitions* of the children, not as physical-homolog identities —
+from the jointly-called *unphased* VCF alone (see §2), without ever
+looking at the underlying 0/1 allele sequence.
 
 ## 2. Unphased VCF input
 
@@ -655,103 +785,152 @@ Only biallelic SNVs enter the map; indels are filtered at read time via
 [`map_builder.rs:164`]({link(map_rs, 164)}) inside `parse_vcf` (the
 driver calls `parse_vcf` at [`map_builder.rs:1092`]({link(map_rs, 1092)})).
 
-## 3. Informative-site detection and letter deduction
+## 3. Informative-site detection, letter tagging, and sibling backfill
 
 ![Figure 3 — Informative-site deduction (paternal and maternal)](fig3.png)
 
-For each VCF record,
+This section describes what `gtg-ped-map` does at *each VCF record
+independently*. The two routines involved —
 [`track_alleles_through_pedigree`]({link(map_rs, 295)}) (driver call at
-[`map_builder.rs:1116`]({link(map_rs, 1116)})) walks the pedigree in
-ancestor-first depth order and, for every `(parent, spouse)` pair,
-calls [`unique_allele`]({link(map_rs, 243)}) (from inside the walk at
+[`map_builder.rs:1116`]({link(map_rs, 1116)})) and
+[`backfill_sibs`]({link(map_rs, 804)}) (driver call at
+[`map_builder.rs:1122`]({link(map_rs, 1122)})) — are called once per
+site, and produce the per-site Latin labels rendered in Figure 3. No
+across-site reasoning has happened yet at this stage.
+
+**Step 1 — informative-site detection.**
+[`track_alleles_through_pedigree`]({link(map_rs, 295)}) walks the
+pedigree in ancestor-first depth order and, for every
+`(parent, spouse)` pair, calls
+[`unique_allele`]({link(map_rs, 243)}) (from inside the walk at
 [`map_builder.rs:315`]({link(map_rs, 315)})) to ask whether the parent
 carries an allele that the spouse does not. Two cases can arise:
 
 - **Dad-informative** (dad het × mom hom): dad's unique allele tags
-  whichever paternal homolog (`A` or `B`) each child inherited. In
-  this simulation these are sites `{dad_info}`.
-- **Mom-informative** (mom het × dad hom): symmetric, tagging `C` or
-  `D`. These are sites `{mom_info}`.
+  whichever paternal homolog each child inherited. In this simulation
+  these are sites `{dad_info}`.
+- **Mom-informative** (mom het × dad hom): symmetric, tagging the
+  child's maternal slot. These are sites `{mom_info}`.
 
-When a child carries the parent's unique allele, the child inherited
-the parent homolog that carries the unique allele; otherwise the
-child inherited the parent's *other* homolog. So the children are
-partitioned into two groups, and the two letters of the parent's pair
-are handed out one per group: the children carrying the unique allele
-get one letter, the children without it get the other. *Which* letter
-goes to which group is not derivable from the genotype data — at
-startup the parent's `(A, B)` pair was assigned arbitrarily with no
-allele attached, and the algorithm
-([`map_builder.rs:333`]({link(map_rs, 333)})) just picks the first
-letter of the pair (`A` for dad-informative sites, `C` for
-mom-informative sites) for the children carrying the unique allele
-and the second by elimination. The IHT therefore records the *partition* (which kids
-inherited the same parental homolog) reliably, but the identification
-of `A` with one specific physical homolog is a free choice per block
-that downstream code (`perform_flips_in_place`, and ultimately
+**Step 2 — tag carriers with the first letter.** When a child carries
+the parent's unique allele, the child inherited the parent homolog
+that carries the unique allele; otherwise the child inherited the
+parent's *other* homolog. So the children are partitioned into two
+groups. The two letters of the parent's pair are handed out one per
+group, but `track_alleles_through_pedigree` only writes a letter to
+the carrier group: it always picks the *first* letter of the parent's
+pair (`A` for dad-informative sites, `C` for mom-informative sites,
+[`map_builder.rs:333`]({link(map_rs, 333)})) and writes it to every
+carrier; the non-carriers are left as `?` and resolved in Step 3.
+
+This per-site choice of "first letter to carriers" is arbitrary in
+two senses. First, the parent's `(A, B)` pair was created at startup
+with no physical-homolog identity attached. Second, the *carrier
+group* itself is defined by whichever physical homolog happens to
+carry the unique allele at that particular site, and that can flip
+between sites. So the same kid can be tagged `A` at one site and `B`
+at the next while the underlying transmission is unchanged — these
+are independent draws of an arbitrary label, not real switches. The
+IHT therefore records the *partition* (which kids inherited the same
+parental homolog) reliably, but identifying `A` with one specific
+physical homolog is a per-site, per-block free choice that downstream
+code (`perform_flips_in_place`, see §4, and ultimately
 `gtg-concordance`'s `2^F`-orientation enumeration) is responsible for
-reconciling. This is what is meant by structural labelling: the IHT
-fixes equivalence classes of inheritance, not letter→allele identity.
+reconciling.
 
-Because the depth-ordered walk always processes a parent before its
-children, [`get_iht_markers`]({link(map_rs, 274)}) (called from inside
-the walk at [`map_builder.rs:328`]({link(map_rs, 328)})) reads the
-parent's already-assigned letters when propagating to the next
-generation, which is what makes the method look "recursive" across
-generations while being expressed as a single loop.
+**Step 3 — sibling backfill.**
+[`backfill_sibs`]({link(map_rs, 804)}) is then called for the same
+site. It exploits the fact that across siblings, both founder
+homologs must be represented somewhere (when a parent has more than
+one child). Concretely, it does three things per parent per site:
+
+1. **Backfill non-carriers.** For every sibling left as `?` after
+   Step 2, write the parent's *other* letter (`B` for dad, `D` for
+   mom). This works whether the sibling was a known non-carrier or
+   had a *missing genotype* — the latter is recovered purely by
+   sibling elimination, since once carriers are identified and only
+   one founder homolog remains, that homolog must have gone to the
+   untagged child. Site 8 in Figure 3 shows this case: Kid1's
+   genotype is `./.` in the VCF, so Step 2 cannot tag it, but Kid2
+   and Kid3 are tagged carriers (`A`), so backfill assigns Kid1 the
+   other letter (`B`).
+2. **Swap by majority** ([`map_builder.rs:881`]({link(map_rs, 881)})).
+   After backfilling, count how many sibling slots carry each of the
+   two letters. If the letter assigned to carriers (`A` or `C`) ends
+   up in the *minority*, swap the two letters across all siblings so
+   the majority class always carries the first letter. This is a
+   deterministic per-site convention so that two sites whose carrier
+   groups happen to be *the same set of kids* — but where one site
+   has a 2-carrier majority and the other a 1-carrier minority —
+   nevertheless emerge with consistent labels, simplifying later
+   block reconciliation.
+3. **Skip families with one child** (the `children.len() > 1` guard
+   at [`map_builder.rs:818`]({link(map_rs, 818)})), where there is no
+   second sibling to provide the elimination signal.
+
+Because the depth-ordered walk in Step 1 always processes a parent
+before its children, [`get_iht_markers`]({link(map_rs, 274)}) (called
+from inside the walk at [`map_builder.rs:328`]({link(map_rs, 328)}))
+reads the parent's already-assigned letters when propagating to the
+next generation, which is what makes the method look "recursive"
+across generations while being expressed as a single loop.
 
 Non-informative sites (both parents het, or both hom for the same
 allele) contribute nothing at this stage and are rendered as `.` in
-Figure 3. The two indicator rows (`*` marks informative sites, `_` marks
-non-informative ones) sit directly above the kid rows, with every
-column aligned, so you can read each letter assignment straight up to
-the indicator that produced it. Each kid's paternal row (`p`) sits
-directly above its maternal row (`m`). Kid3's `p` row already exhibits
-the A→B recombination at sites 3/4, even though no block collapse has
-happened yet.
+Figure 3. The two indicator rows (`*` marks informative sites, `_`
+marks non-informative ones) sit directly above the kid rows, with
+every column aligned, so you can read each letter assignment straight
+up to the indicator that produced it. Each kid's paternal row (`p`)
+sits directly above its maternal row (`m`). Notice in Figure 3 that
+Kid2's paternal row is *not* a uniform run of one letter even though
+Kid2 inherits the same physical homolog (`β`) at every dad-informative
+site: the per-site `A`/`B` assignment shifts as the carrier group and
+its majority shift across sites. That apparent letter switching is
+the per-site arbitrariness described in Step 2 — it is not a real
+recombination signal, and §4's flip pass is what reconciles it.
 
-## 4. Block collapse and noise filtering
+## 4. Block collapse, noise filtering, and flip reconciliation
 
 ![Figure 4 — Collapsed blocks with recombination](fig4.png)
 
-Several Rust routines clean the per-site letter trace up before it is
-written to disk:
+The per-site labels in Figure 3 are correct as *partitions* of the
+children but, as flagged in §3, the letter convention can flip from
+site to site. Several Rust routines reconcile and clean the trace up
+before it is written to disk:
 
-1. [`backfill_sibs`]({link(map_rs, 804)}) (driver call at
-   [`map_builder.rs:1122`]({link(map_rs, 1122)})) uses the fact that
-   siblings must together carry both founder homologs. If exactly one
-   child is tagged at a site, the others can be inferred by elimination.
-   In this toy simulation every informative site already tags all three
-   kids, so backfill is a no-op here, but on real data it is essential
-   in noisy regions.
-2. [`collapse_identical_iht`]({link(map_rs, 385)}) (driver call at
-   [`map_builder.rs:1191`]({link(map_rs, 1191)})) merges adjacent sites
-   with compatible letter assignments into blocks, while
+1. [`collapse_identical_iht`]({link(map_rs, 385)}) (driver call at
+   [`map_builder.rs:1191`]({link(map_rs, 1191)})) merges adjacent
+   sites with compatible letter assignments into blocks, while
    [`fill_missing_values`]({link(map_rs, 617)}) (driver call at
    [`map_builder.rs:1200`]({link(map_rs, 1200)})) and
    [`fill_missing_values_by_neighbor`]({link(map_rs, 540)}) (driver
-   call at [`map_builder.rs:1201`]({link(map_rs, 1201)})) fill the `.`
-   gaps visible in Figure 3 from flanking blocks.
-3. [`count_matching_neighbors`]({link(map_rs, 935)}) (driver call at
+   call at [`map_builder.rs:1201`]({link(map_rs, 1201)})) fill the
+   `.` gaps visible in Figure 3 from flanking blocks.
+2. [`count_matching_neighbors`]({link(map_rs, 935)}) (driver call at
    [`map_builder.rs:1172`]({link(map_rs, 1172)})) and
    [`mask_child_alleles`]({link(map_rs, 970)}) (driver call at
    [`map_builder.rs:1187`]({link(map_rs, 1187)})) identify isolated
    runs shorter than `--run` (default 10 markers) and mask them back
-   to `?` as likely sequencing noise, so that collapse does not invent
-   spurious recombinations.
-4. [`perform_flips_in_place`]({link(map_rs, 702)}) enforces consistent
-   founder-letter orientation across blocks, since the two letters in
-   a founder's pair are interchangeable within any single block. The
-   driver calls it three times — before and after block collapse,
-   and again after gap fill — at
+   to `?` as likely sequencing noise, so that collapse does not
+   invent spurious recombinations.
+3. [`perform_flips_in_place`]({link(map_rs, 702)}) enforces a
+   consistent founder-letter orientation across blocks, since the
+   two letters in a founder's pair are interchangeable within any
+   single block. This is the routine that finally pins each block's
+   `A`/`B` (or `C`/`D`) convention so that consecutive blocks agree
+   on every kid that did *not* recombine. The driver calls it three
+   times — before and after block collapse, and again after gap
+   fill — at
    [`map_builder.rs:1135`]({link(map_rs, 1135)}),
    [`map_builder.rs:1193`]({link(map_rs, 1193)}), and
    [`map_builder.rs:1203`]({link(map_rs, 1203)}).
 
 After these steps, each kid's paternal and maternal slots are fully
-resolved — shown on separate rows per kid in Figure 4. Kid3's
-highlighted A→B transition on the paternal row is emitted to
-`{{prefix}}.recombinants.txt` by
+resolved — shown on separate rows per kid in Figure 4. Within each
+block all three kids' labels agree on a single partition; across
+adjacent blocks, only the kid(s) that genuinely recombined change
+letter. Kid3's highlighted `A`→`B` transition on the paternal row is
+emitted to `{{prefix}}.recombinants.txt` by
 [`summarize_child_changes`]({link(map_rs, 673)}) (driver call at
 [`map_builder.rs:1228`]({link(map_rs, 1228)})).
 
@@ -759,13 +938,24 @@ highlighted A→B transition on the paternal row is emitted to
 
 ![Figure 5 — Truth vs deduced founder labels](fig5.png)
 
-For every kid the deduced paternal and maternal label streams match the
-ground truth at every site ({mismatches} mismatches out of
-{total_slots} label slots), including Kid3's recombination. The full
-output of `gtg-ped-map` for this chromosome is the set of blocks shown
-above plus the `recombinants.txt` entry for Kid3's switch — and
-critically, **nothing else**. The block map stores only founder
-letters; it does *not* store the 0/1 allele sequence of any haplotype.
+The truth row uses Greek (physical homologs); the deduced row uses
+Latin (per-block algorithm letters). They cannot be compared
+character-by-character because, as discussed in §3 and §4, the
+algorithm guarantees the *partition* of children at each site — not
+which physical homolog each Latin letter corresponds to. Two
+labelings are therefore counted as agreeing at a site iff they induce
+the same partition of the three children: for every kid pair `(i,j)`,
+truth and deduced agree on whether kid *i* and kid *j* share a
+homolog. By that criterion the deduced trace matches the ground truth
+at every site ({mismatches} partition mismatches out of
+{total_partitions} partition slots = paternal + maternal per site),
+including Kid3's recombination at sites 3/4.
+
+The full output of `gtg-ped-map` for this chromosome is the set of
+blocks shown above plus the `recombinants.txt` entry for Kid3's
+switch — and critically, **nothing else**. The block map stores only
+founder letters; it does *not* store the 0/1 allele sequence of any
+haplotype.
 
 Reconstructing which allele each letter represents at every VCF site
 is the job of `gtg-concordance`, which will have its own wiki page
