@@ -748,7 +748,7 @@ phrase has two stages, both relevant downstream:
   any structural information, because the two letters in a founder's
   pair are interchangeable within any single block. That residual
   per-block freedom is what `gtg-concordance` resolves later by
-  enumerating `2^n` founder-phase orientations (where `n` is the
+  enumerating `2^F` founder-phase orientations (where `F` is the
   number of founders in the pedigree, i.e. one factor of 2 per
   founder for the independent A↔B / C↔D / … swap) and picking the
   one that best matches the observed alleles.
