@@ -593,6 +593,23 @@ which hands each founder a fresh pair of capital letters — `(A,B)`,
 them. The letters are pure structural placeholders whose only job is
 to be carried from founders to descendants.
 
+The two `Iht::new` calls play different roles. The first
+([`map_builder.rs:1059`]({link(map_rs, 1059)})) builds a **master
+template** that is never mutated — only its
+[`legend()`]({link(iht_rs, 330)}) is read, to print the column header
+(`Dad:A|B Mom:C|D Kid1:?|? …`) at the top of the output files. The
+second ([`map_builder.rs:1111`]({link(map_rs, 1111)})) allocates a
+fresh `local_iht` per VCF record that
+[`track_alleles_through_pedigree`]({link(map_rs, 295)}) then *mutates*
+in place to record which founder letter each child inherited at that
+site. A per-site copy is needed rather than reusing the master because
+(i) each site's IHT vector is itself an output, so it cannot be shared
+across sites, and (ii) the master is hard-coded to
+`ChromType::Autosome`, whereas `local_iht` uses the chromosome's
+actual zygosity (autosome vs. chrX, decided at
+[`map_builder.rs:1086`]({link(map_rs, 1086)})), which changes how
+letters are laid out for males on chrX.
+
 In this simulation:
 
 - **Kid1** inherits `(A, C)` with no recombination.
@@ -1959,9 +1976,29 @@ a fresh pair of capital letters — `(A,B)` for founder 0, `(C,D)` for
 founder 1, `(E,F)` for founder 2, and so on — and assigns one letter to
 the paternal homolog and one to the maternal homolog. Non-founders are
 initialised with `?` slots that will be filled during the per-site walk.
-The driver re-invokes `Iht::new` per VCF record at
-[`map_builder.rs:1111`]({map_rs_1111}) to get a fresh working copy,
-leaving the master template untouched.
+The master template is never mutated: only its
+[`legend()`]({iht_rs_330}) is read, to print the column header
+(`Dad:A|B Mom:C|D Kid1:?|? …`) at the top of the IHT and marker
+output files. Per-site bookkeeping happens on a separate object — the
+driver re-invokes `Iht::new` per VCF record at
+[`map_builder.rs:1111`]({map_rs_1111}) to allocate a fresh `local_iht`
+that [`track_alleles_through_pedigree`]({map_rs_295}) then *mutates* in
+place to record which founder letter each child inherited at that
+site. Two reasons a per-site copy is needed rather than reusing the
+master:
+
+1. **Each site needs its own mutable IHT vector** — that vector *is*
+   the per-site output, so it cannot be shared across sites.
+2. **Zygosity is per-chromosome.** The master is hard-coded to
+   `ChromType::Autosome` (it only feeds the header), whereas
+   `local_iht` is built with the chromosome's actual `zygosity`
+   (autosome vs. chrX, decided at
+   [`map_builder.rs:1086`]({map_rs_1086})), which changes how letters
+   are laid out for males on chrX.
+
+The two objects share a founder-letter convention only because both
+flow through `Iht::new` with the same `family.founders()` /
+`family.offspring()` ordering.
 
 **No allele sequence is associated with these letters at this stage.**
 That deliberate decoupling is what makes the rest of the pipeline
@@ -2346,6 +2383,7 @@ def emit_methods_section(out_path: Path) -> None:
         map_rs_935=link("code/rust/src/bin/map_builder.rs", 935),
         map_rs_970=link("code/rust/src/bin/map_builder.rs", 970),
         map_rs_1059=link("code/rust/src/bin/map_builder.rs", 1059),
+        map_rs_1086=link("code/rust/src/bin/map_builder.rs", 1086),
         map_rs_1092=link("code/rust/src/bin/map_builder.rs", 1092),
         map_rs_1111=link("code/rust/src/bin/map_builder.rs", 1111),
         map_rs_1116=link("code/rust/src/bin/map_builder.rs", 1116),
@@ -2374,6 +2412,7 @@ def emit_methods_section(out_path: Path) -> None:
         conc_rs_534=link("code/rust/src/bin/gtg_concordance.rs", 534),
         iht_rs_172=link("code/rust/src/iht.rs", 172),
         iht_rs_181=link("code/rust/src/iht.rs", 181),
+        iht_rs_330=link("code/rust/src/iht.rs", 330),
         iht_rs_442=link("code/rust/src/iht.rs", 442),
         iht_rs_492=link("code/rust/src/iht.rs", 492),
         iht_rs_606=link("code/rust/src/iht.rs", 606),
