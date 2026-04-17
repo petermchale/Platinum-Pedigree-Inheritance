@@ -812,14 +812,22 @@ carries an allele that the spouse does not. Two cases can arise:
 - **Mom-informative** (mom het × dad hom): symmetric, tagging the
   child's maternal slot. These are sites `{mom_info}`.
 
-**Step 2 — tag carriers with the first letter.** When a child carries
-the parent's unique allele, the child inherited the parent homolog
-that carries the unique allele; otherwise the child inherited the
-parent's *other* homolog. So the children are partitioned into two
-groups. The two letters of the parent's pair are handed out one per
-group, but `track_alleles_through_pedigree` only writes a letter to
-the carrier group: it always picks the *first* letter of the parent's
-pair (`A` for dad-informative sites, `C` for mom-informative sites,
+**Step 2 — tag carriers with the first letter.** At an informative
+site the parent has two distinct alleles, exactly one of which is
+*unique* to that parent (i.e. absent from the spouse). The
+operational test for each child is then a single allele lookup at
+that site: does the child's genotype contain the parent's unique
+allele, yes or no? Define a child to be a **carrier** (of the
+parent's unique allele, at this site) iff the answer is yes. If the
+child is a carrier, it must have inherited the parental homolog that
+carries the unique allele (since the spouse could not have donated
+it); if not, the child must have inherited the parent's *other*
+homolog (the one carrying the allele common to both parents). So the
+children are partitioned into two groups by the carrier test. The
+two letters of the parent's pair are handed out one per group, but
+`track_alleles_through_pedigree` only writes a letter to the carrier
+group: it always picks the *first* letter of the parent's pair (`A`
+for dad-informative sites, `C` for mom-informative sites,
 [`map_builder.rs:333`]({link(map_rs, 333)})) and writes it to every
 carrier; the non-carriers are left as `?` and resolved in Step 3.
 
