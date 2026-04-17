@@ -724,11 +724,31 @@ labels for the figure; mom carries **γ** and **δ**. We use Greek
 letters at this stage to emphasise that these names refer to specific
 *physical homologs* in the founders' cells. The Latin labels (`A`,
 `B`, `C`, `D`) that `gtg-ped-map` eventually writes are something
-different: they are *per-site, per-block* algorithm tags whose
-correspondence to a particular physical homolog is not fixed until
-downstream reconciliation (see §3 and §4). It is a recurring source of
-confusion to read `A` as a fixed name for dad's first physical
-homolog; it is not.
+different: they are *per-site, per-block* algorithm tags. The
+phrase has two stages, both relevant downstream:
+
+- **Per-site** refers to the raw output of `track_alleles_through_pedigree`
+  + `backfill_sibs` described in §3, which runs once per VCF record:
+  every site independently picks which of the parent's two letters
+  goes to the carrier group (always the *first* letter of the pair),
+  so the same kid can be tagged `A` at one site and `B` at the next
+  even though it inherited the same physical homolog. Figure 3 makes
+  this visible in Kid2's paternal row.
+- **Per-block** refers to what survives after `perform_flips_in_place`
+  + block collapse in §4, which is what `gtg-ped-map` actually writes
+  to disk: each contiguous block of sites that share the same
+  partition gets one fixed, self-consistent labeling — but the block
+  as a whole can still be flipped `A`↔`B` without losing any
+  structural information, because the two letters in a founder's pair
+  are interchangeable within any single block. That residual
+  per-block freedom is what `gtg-concordance` resolves later by
+  enumerating `2^F` founder-phase orientations and picking the one
+  that best matches the observed alleles.
+
+In neither stage are Latin letters pinned to a specific physical
+homolog by `gtg-ped-map` itself, so it is a recurring source of
+confusion to read `A` as a fixed name for dad's `α` homolog; it is
+not.
 
 In this simulation:
 
