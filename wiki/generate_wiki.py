@@ -333,17 +333,26 @@ def _per_site_parent_labels(
     letter_first: str,
     letter_second: str,
     slot: str,  # "p" or "m"
-) -> Dict[str, List[str]]:
+) -> Tuple[Dict[str, List[str]], Dict[str, List[str]], Dict[str, List[str]]]:
     """Faithfully simulate, per informative site, what
     track_alleles_through_pedigree (carriers tagged with letter_first)
     plus backfill_sibs (non-carriers get letter_second; swap-by-majority
     if needed) would write to each kid's slot.
 
-    Returns {kid: [label_or_'?'] * NUM_SITES} where '?' means the site is
-    not informative for this slot.
+    Returns three {kid: [label_or_'?'] * NUM_SITES} dicts, one per
+    intermediate state of the per-site pipeline:
+      stage1: post-track_alleles_through_pedigree (only carriers
+              tagged; non-carriers and missing-genotype kids stay '?')
+      stage2: post-backfill_sibs non-carrier fill, *before* the
+              swap-by-majority step (every informative slot is filled
+              with letter_first or letter_second)
+      stage3: post-backfill_sibs swap-by-majority (final per-site
+              labels written by gtg-ped-map for this VCF record)
     """
     kids = ["Kid1", "Kid2", "Kid3"]
-    out: Dict[str, List[str]] = {k: ["?"] * NUM_SITES for k in kids}
+    stage1: Dict[str, List[str]] = {k: ["?"] * NUM_SITES for k in kids}
+    stage2: Dict[str, List[str]] = {k: ["?"] * NUM_SITES for k in kids}
+    stage3: Dict[str, List[str]] = {k: ["?"] * NUM_SITES for k in kids}
 
     for s in info_sites:
         parent_alleles = {sim[parent_hap_a_key][s], sim[parent_hap_b_key][s]}
@@ -353,7 +362,7 @@ def _per_site_parent_labels(
             continue
         unique = next(iter(unique_set))
 
-        # Step 1 (track_alleles_through_pedigree): tag carriers with
+        # Stage 1 (track_alleles_through_pedigree): tag carriers with
         # letter_first. Missing-genotype kids stay untagged.
         per_kid: Dict[str, str] = {}
         for k in kids:
@@ -364,17 +373,22 @@ def _per_site_parent_labels(
             kid_alleles = {int(gt[0]), int(gt[2])}
             per_kid[k] = letter_first if unique in kid_alleles else "?"
 
-        # Step 2 (backfill_sibs): if at least one carrier was tagged,
-        # assign letter_second to every other (non-missing) sibling.
+        for k in kids:
+            stage1[k][s] = per_kid[k]
+
+        # Stage 2 (backfill_sibs non-carrier fill, *before* swap):
+        # if at least one carrier was tagged, assign letter_second to
+        # every other (non-missing OR missing) sibling.
         any_carrier = any(per_kid[k] == letter_first for k in kids)
         if any_carrier:
-            # Backfill: untagged sibs (whether non-carrier or missing)
-            # get letter_second, deducing the missing kid by elimination.
             for k in kids:
                 if per_kid[k] == "?":
                     per_kid[k] = letter_second
 
-        # Step 3 (backfill swap-by-majority, map_builder.rs:881-905):
+        for k in kids:
+            stage2[k][s] = per_kid[k]
+
+        # Stage 3 (backfill swap-by-majority, map_builder.rs:881-905):
         # if letter_first appears fewer times than letter_second across
         # children, swap them so the majority class carries letter_first.
         first_count = sum(1 for k in kids if per_kid[k] == letter_first)
@@ -387,9 +401,9 @@ def _per_site_parent_labels(
                     per_kid[k] = letter_first
 
         for k in kids:
-            out[k][s] = per_kid[k]
+            stage3[k][s] = per_kid[k]
 
-    return out
+    return stage1, stage2, stage3
 
 
 def _flip_blocks(
@@ -459,14 +473,14 @@ def component_1_nuclear_family(out_dir: Path) -> None:
         "Kid3": "kid3_unphased",
     }
 
-    paternal_deduced = _per_site_parent_labels(
+    pat_stage1, pat_stage2, pat_stage3 = _per_site_parent_labels(
         sim, dad_info,
         parent_hap_a_key="dad_alpha", parent_hap_b_key="dad_beta",
         other_hap_a_key="mom_gamma", other_hap_b_key="mom_delta",
         kid_unphased_key=kid_unphased_key,
         letter_first="A", letter_second="B", slot="p",
     )
-    maternal_deduced = _per_site_parent_labels(
+    mat_stage1, mat_stage2, mat_stage3 = _per_site_parent_labels(
         sim, mom_info,
         parent_hap_a_key="mom_gamma", parent_hap_b_key="mom_delta",
         other_hap_a_key="dad_alpha", other_hap_b_key="dad_beta",
@@ -474,6 +488,8 @@ def component_1_nuclear_family(out_dir: Path) -> None:
         letter_first="C", letter_second="D", slot="m",
     )
 
+    paternal_deduced = pat_stage3
+    maternal_deduced = mat_stage3
     paternal_blocks = _flip_blocks(paternal_deduced, dad_info, ("A", "B"))
     maternal_blocks = _flip_blocks(maternal_deduced, mom_info, ("C", "D"))
 
@@ -548,27 +564,84 @@ def component_1_nuclear_family(out_dir: Path) -> None:
             marks[s] = "*"
         return (" " * row_prefix_width) + " ".join(marks)
 
-    body_c = [
-        "Figure 3 — Informative-site deduction (paternal and maternal)",
-        "",
-        "Deduced founder-letter labels at informative sites only",
-        "('.' = site not informative for that slot):",
-        "",
-        mark_sites(dad_info) + "   <- dad-informative (dad het x mom hom)",
-        mark_sites(mom_info) + "   <- mom-informative (mom het x dad hom)",
-    ]
-    for k in kids:
-        pat_row = f"  {k} p:    " + " ".join(
-            paternal_deduced[k][i] if i in dad_info else "."
-            for i in range(NUM_SITES)
-        )
-        mat_row = f"  {k} m:    " + " ".join(
-            maternal_deduced[k][i] if i in mom_info else "."
-            for i in range(NUM_SITES)
-        )
-        body_c.append(pat_row)
-        body_c.append(mat_row)
-    _render_panel_image(body_c, nf_dir / "fig3.png")
+    def _build_fig3_panel(
+        title: str,
+        pat_state: Dict[str, List[str]],
+        mat_state: Dict[str, List[str]],
+        legend_lines: List[str],
+    ) -> List[str]:
+        body = [
+            title,
+            "",
+        ]
+        body.extend(legend_lines)
+        body += [
+            "",
+            mark_sites(dad_info) + "   <- dad-informative (dad het x mom hom)",
+            mark_sites(mom_info) + "   <- mom-informative (mom het x dad hom)",
+        ]
+        for k in kids:
+            pat_row = f"  {k} p:    " + " ".join(
+                pat_state[k][i] if i in dad_info else "."
+                for i in range(NUM_SITES)
+            )
+            mat_row = f"  {k} m:    " + " ".join(
+                mat_state[k][i] if i in mom_info else "."
+                for i in range(NUM_SITES)
+            )
+            body.append(pat_row)
+            body.append(mat_row)
+        return body
+
+    _render_panel_image(
+        _build_fig3_panel(
+            "Figure 3.1 — After track_alleles_through_pedigree (carriers tagged only)",
+            pat_stage1, mat_stage1,
+            [
+                "Carriers (kids whose genotype contains the parent's unique",
+                "allele) are tagged with the first letter of the parent's pair",
+                "(A for dad, C for mom). Non-carriers and missing-genotype",
+                "kids stay '?'. '.' = site not informative for that slot.",
+            ],
+        ),
+        nf_dir / "fig3_1.png",
+    )
+
+    _render_panel_image(
+        _build_fig3_panel(
+            "Figure 3.2 — After backfill_sibs non-carrier fill (before swap)",
+            pat_stage2, mat_stage2,
+            [
+                "Backfill writes the parent's *other* letter (B for dad, D",
+                "for mom) into every '?' slot at an informative site —",
+                "including missing-genotype kids, recovered by sibling",
+                "elimination. Carriers still hold the first letter at every",
+                "site. The swap-by-majority step has not run yet.",
+            ],
+        ),
+        nf_dir / "fig3_2.png",
+    )
+
+    _render_panel_image(
+        _build_fig3_panel(
+            "Figure 3.3 — After backfill_sibs swap-by-majority (final per-site labels)",
+            pat_stage3, mat_stage3,
+            [
+                "Where the carrier group was the *minority* at a site, the",
+                "two letters are swapped across that site so the majority",
+                "class always carries the first letter. At those sites the",
+                "carrier therefore now reads B (or D) — this is the per-site",
+                "letter arbitrariness that downstream flips reconcile (§4).",
+            ],
+        ),
+        nf_dir / "fig3_3.png",
+    )
+
+    # Remove the old single-panel fig3.png if it exists (now superseded
+    # by fig3_1 / fig3_2 / fig3_3).
+    old_fig3 = nf_dir / "fig3.png"
+    if old_fig3.exists():
+        old_fig3.unlink()
 
     # ------------------------------------------------------------------
     # Panel D — collapsed blocks with paternal / maternal on separate
@@ -815,10 +888,10 @@ driver calls `parse_vcf` at [`map_builder.rs:1092`]({link(map_rs, 1092)})).
 
 ## 3. Informative-site detection, letter tagging, and sibling backfill
 
-![Figure 3 — Informative-site deduction (paternal and maternal)](fig3.png)
-
 This section describes what `gtg-ped-map` does at *each VCF record
-independently*. The two routines involved —
+independently*, and shows the three intermediate states the per-site
+labels pass through (Figures 3.1, 3.2, 3.3 below). The two routines
+involved —
 [`track_alleles_through_pedigree`]({link(map_rs, 295)}) (driver call at
 [`map_builder.rs:1116`]({link(map_rs, 1116)})) and
 [`backfill_sibs`]({link(map_rs, 804)}) (driver call at
@@ -867,6 +940,14 @@ parent may carry only one valid letter at a given site, in which
 case `find_valid_char` returns whichever of the two slots is
 populated; the same routine handles both cases.)
 
+![Figure 3.1 — After track_alleles_through_pedigree (carriers tagged only)](fig3_1.png)
+
+Figure 3.1 shows the state at the end of Step 2. Only the carrier
+slots are filled; non-carriers and missing-genotype kids are still
+`?`. Note Kid1 at site 8: its genotype is `./.` in the VCF (see
+Figure 2), so the carrier test cannot run for Kid1 there and its
+slot is `?`.
+
 This per-site choice of "first letter to carriers" is arbitrary in
 two senses. First, the parent's `(A, B)` pair was created at startup
 with no physical-homolog identity attached. Second, the *carrier
@@ -886,31 +967,57 @@ reconciling.
 [`backfill_sibs`]({link(map_rs, 804)}) is then called for the same
 site. It exploits the fact that across siblings, both founder
 homologs must be represented somewhere (when a parent has more than
-one child). Concretely, it does three things per parent per site:
+one child). It runs in two sub-stages — a non-carrier fill (3a)
+followed by a swap-by-majority normalisation (3b) — plus a guard
+that disables it for one-child families.
 
-1. **Backfill non-carriers.** For every sibling left as `?` after
-   Step 2, write the parent's *other* letter (`B` for dad, `D` for
-   mom). This works whether the sibling was a known non-carrier or
-   had a *missing genotype* — the latter is recovered purely by
-   sibling elimination, since once carriers are identified and only
-   one founder homolog remains, that homolog must have gone to the
-   untagged child. Site 8 in Figure 3 shows this case: Kid1's
-   genotype is `./.` in the VCF, so Step 2 cannot tag it, but Kid2
-   and Kid3 are tagged carriers (`A`), so backfill assigns Kid1 the
-   other letter (`B`).
-2. **Swap by majority** ([`map_builder.rs:881`]({link(map_rs, 881)})).
-   After backfilling, count how many sibling slots carry each of the
-   two letters. If the letter assigned to carriers (`A` or `C`) ends
-   up in the *minority*, swap the two letters across all siblings so
-   the majority class always carries the first letter. This is a
-   deterministic per-site convention so that two sites whose carrier
-   groups happen to be *the same set of kids* — but where one site
-   has a 2-carrier majority and the other a 1-carrier minority —
-   nevertheless emerge with consistent labels, simplifying later
-   block reconciliation.
-3. **Skip families with one child** (the `children.len() > 1` guard
-   at [`map_builder.rs:818`]({link(map_rs, 818)})), where there is no
-   second sibling to provide the elimination signal.
+**Step 3a — backfill non-carriers.** For every sibling left as `?`
+after Step 2, write the parent's *other* letter (`B` for dad, `D`
+for mom). This works whether the sibling was a known non-carrier or
+had a *missing genotype* — the latter is recovered purely by sibling
+elimination, since once carriers are identified and only one founder
+homolog remains, that homolog must have gone to the untagged child.
+
+![Figure 3.2 — After backfill_sibs non-carrier fill (before swap)](fig3_2.png)
+
+Figure 3.2 shows the state at the end of Step 3a. Compared to
+Figure 3.1, every informative slot is now filled. The interesting
+column is site 8: Kid1's slot, which was `?` in Figure 3.1 because
+the VCF genotype is missing, is now `B` — recovered purely by the
+fact that Kid2 and Kid3 are tagged `A` carriers, so the only
+remaining dad homolog must have gone to Kid1. Crucially, in this
+state the rule "carriers always hold the first letter" still holds
+strictly at every site.
+
+**Step 3b — swap by majority**
+([`map_builder.rs:881`]({link(map_rs, 881)})). Count how many sibling
+slots now carry each of the two letters. If the letter assigned to
+carriers (`A` or `C`) ends up in the *minority*, swap the two
+letters across all siblings so the majority class always carries
+the first letter. This is a deterministic per-site convention so
+that two sites whose carrier groups happen to be *the same set of
+kids* — but where one site has a 2-carrier majority and the other a
+1-carrier minority — nevertheless emerge with consistent labels,
+simplifying later block reconciliation.
+
+![Figure 3.3 — After backfill_sibs swap-by-majority (final per-site labels)](fig3_3.png)
+
+Figure 3.3 shows the state at the end of Step 3b — the labels
+`gtg-ped-map` actually writes for this VCF record. Compared to
+Figure 3.2, sites whose carrier group was the minority now have
+their entire row swapped. Site 1 of the paternal slot is the
+clearest example: in Figure 3.2 Kid2 (the lone carrier) holds `A`
+and the non-carriers Kid1 and Kid3 hold `B`; the swap sends Kid2 to
+`B` and Kid1, Kid3 to `A`. The same flip occurs at sites 3, 6, 7
+on the maternal slot. So between Figure 3.2 and Figure 3.3 the
+"carrier always reads first letter" invariant is broken on
+purpose — this is the per-site letter arbitrariness that downstream
+flips reconcile (§4).
+
+**Step 3c — skip families with one child** (the
+`children.len() > 1` guard at
+[`map_builder.rs:818`]({link(map_rs, 818)})), where there is no
+second sibling to provide the elimination signal.
 
 Because the depth-ordered walk in Step 1 always processes a parent
 before its children, [`get_iht_markers`]({link(map_rs, 274)}) (called
@@ -921,17 +1028,18 @@ across generations while being expressed as a single loop.
 
 Non-informative sites (both parents het, or both hom for the same
 allele) contribute nothing at this stage and are rendered as `.` in
-Figure 3. The two indicator rows (`*` marks informative sites, `_`
-marks non-informative ones) sit directly above the kid rows, with
-every column aligned, so you can read each letter assignment straight
-up to the indicator that produced it. Each kid's paternal row (`p`)
-sits directly above its maternal row (`m`). Notice in Figure 3 that
-Kid2's paternal row is *not* a uniform run of one letter even though
-Kid2 inherits the same physical homolog (`β`) at every dad-informative
-site: the per-site `A`/`B` assignment shifts as the carrier group and
-its majority shift across sites. That apparent letter switching is
-the per-site arbitrariness described in Step 2 — it is not a real
-recombination signal, and §4's flip pass is what reconciles it.
+all three figures. The two indicator rows (`*` marks informative
+sites, `_` marks non-informative ones) sit directly above the kid
+rows, with every column aligned, so you can read each letter
+assignment straight up to the indicator that produced it. Each kid's
+paternal row (`p`) sits directly above its maternal row (`m`).
+Notice in Figure 3.3 that Kid2's paternal row is *not* a uniform run
+of one letter even though Kid2 inherits the same physical homolog
+(`β`) at every dad-informative site: the per-site `A`/`B` assignment
+shifts as the carrier group and its majority shift across sites.
+That apparent letter switching is the per-site arbitrariness
+introduced by Step 3b — it is not a real recombination signal, and
+§4's flip pass is what reconciles it.
 
 ## 4. Block collapse, noise filtering, and flip reconciliation
 
