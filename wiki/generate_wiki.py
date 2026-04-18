@@ -724,6 +724,144 @@ def component_1_nuclear_family(out_dir: Path) -> None:
     _render_panel_image(body_e, nf_dir / "fig5.png")
 
     # ------------------------------------------------------------------
+    # Panels F.1, F.2 — equivalent pairwise-comparison algorithm (§6).
+    #
+    # At every informative site we can recover each kid's inherited allele
+    # on one of its two slots (paternal slot at dad-informative sites,
+    # maternal slot at mom-informative sites) directly from the VCF, by
+    # the unique-allele rule: kid's inherited allele at that slot is the
+    # parent's unique allele iff the kid's genotype contains it. Pair-
+    # wise "=" / "X" comparisons of those alleles across sites recover
+    # exactly the same structural partition (and the same recombination
+    # signals) that the carrier + backfill + flip pipeline in §3-4
+    # produces — without ever assigning Latin letters per site.
+    # ------------------------------------------------------------------
+    def _paternal_allele(kid_name: str, site: int) -> str:
+        """Paternal-slot allele the kid inherited from dad at a dad-
+        informative site, as recoverable from the VCF alone. Returns
+        "?" if the kid's genotype is missing at that site."""
+        if site in KID_MISSING[kid_name]:
+            return "?"
+        # At a dad-informative site, dad is het and mom is homozygous.
+        # The paternal allele the kid inherited equals dad's unique
+        # allele iff the kid's genotype contains that allele.
+        parent_alleles = {sim["dad_alpha"][site], sim["dad_beta"][site]}
+        other_alleles = {sim["mom_gamma"][site], sim["mom_delta"][site]}
+        unique = next(iter(parent_alleles - other_alleles))
+        common = next(iter(parent_alleles & other_alleles))
+        gt = sim[kid_unphased_key[kid_name]][site]
+        kid_alleles = {int(gt[0]), int(gt[2])}
+        return str(unique) if unique in kid_alleles else str(common)
+
+    def _maternal_allele(kid_name: str, site: int) -> str:
+        if site in KID_MISSING[kid_name]:
+            return "?"
+        parent_alleles = {sim["mom_gamma"][site], sim["mom_delta"][site]}
+        other_alleles = {sim["dad_alpha"][site], sim["dad_beta"][site]}
+        unique = next(iter(parent_alleles - other_alleles))
+        common = next(iter(parent_alleles & other_alleles))
+        gt = sim[kid_unphased_key[kid_name]][site]
+        kid_alleles = {int(gt[0]), int(gt[2])}
+        return str(unique) if unique in kid_alleles else str(common)
+
+    def _kid_slot_row(kid_name: str, slot: str) -> List[str]:
+        out = ["."] * NUM_SITES
+        if slot == "p":
+            for s in dad_info:
+                out[s] = _paternal_allele(kid_name, s)
+        else:
+            for s in mom_info:
+                out[s] = _maternal_allele(kid_name, s)
+        return out
+
+    kid_pat_alleles = {k: _kid_slot_row(k, "p") for k in kids}
+    kid_mat_alleles = {k: _kid_slot_row(k, "m") for k in kids}
+
+    # Figure 6.1 — inferred kid gamete alleles at informative sites.
+    row_prefix_width_6 = len("  Kid1 p:    ")
+
+    def mark_sites_6(dad_sites: List[int], mom_sites: List[int]) -> str:
+        marks = ["_"] * NUM_SITES
+        for s in dad_sites:
+            marks[s] = "*"
+        for s in mom_sites:
+            marks[s] = "+"
+        return (" " * row_prefix_width_6) + " ".join(marks)
+
+    body_f1 = [
+        "Figure 6.1 — Allele inherited by each kid on the informative slot",
+        "",
+        "At a dad-informative site (*) the entry is the 0/1 allele the kid",
+        "inherited from dad on its paternal slot; at a mom-informative",
+        "site (+) it is the allele the kid inherited from mom on its",
+        "maternal slot. '.' = site not informative for this slot; '?' =",
+        "kid's VCF genotype missing. Each value is deduced from Figure",
+        "2 alone (see prose) — no Latin letters, no backfill, no swap.",
+        "",
+        mark_sites_6(dad_info, mom_info) + "   * = dad-informative, + = mom-informative",
+    ]
+    for k in kids:
+        body_f1.append(
+            f"  {k} p:    " + " ".join(kid_pat_alleles[k][i] for i in range(NUM_SITES))
+        )
+        body_f1.append(
+            f"  {k} m:    " + " ".join(kid_mat_alleles[k][i] for i in range(NUM_SITES))
+        )
+    body_f1 += [
+        "",
+        "Kid1 p at site 8 is '?' because Kid1's genotype is './.' there.",
+    ]
+    _render_panel_image(body_f1, nf_dir / "fig6_1.png")
+
+    # Figure 6.2 — pairwise kid-vs-kid agreement at informative sites.
+    def _pair_row(
+        allele_rows: Dict[str, List[str]],
+        info_sites: List[int],
+        k1: str,
+        k2: str,
+    ) -> List[str]:
+        out = ["."] * NUM_SITES
+        for s in info_sites:
+            a = allele_rows[k1][s]
+            b = allele_rows[k2][s]
+            if a == "?" or b == "?":
+                out[s] = "?"
+            elif a == b:
+                out[s] = "="
+            else:
+                out[s] = "X"
+        return out
+
+    pairs = [("Kid1", "Kid2"), ("Kid1", "Kid3"), ("Kid2", "Kid3")]
+    body_f2 = [
+        "Figure 6.2 — Pairwise agreement of kid gamete alleles",
+        "",
+        "'=' means the two kids inherited the SAME parental homolog at",
+        "that site; 'X' means they inherited DIFFERENT homologs; '?' =",
+        "at least one kid's genotype missing; '.' = site not informative",
+        "for this slot.",
+        "",
+        mark_sites_6(dad_info, mom_info) + "   * = dad-informative, + = mom-informative",
+    ]
+    for k1, k2 in pairs:
+        pat_cmp = _pair_row(kid_pat_alleles, dad_info, k1, k2)
+        mat_cmp = _pair_row(kid_mat_alleles, mom_info, k1, k2)
+        body_f2.append(
+            f"  ({k1},{k2}) p:  " + " ".join(pat_cmp)
+        )
+        body_f2.append(
+            f"  ({k1},{k2}) m:  " + " ".join(mat_cmp)
+        )
+    body_f2 += [
+        "",
+        "Paternal row (Kid1,Kid3) flips '=' -> 'X' between sites 1 and 4,",
+        "and (Kid2,Kid3) flips 'X' -> '=' across the same interval — both",
+        "signal Kid3's paternal recombination, the same event that §4",
+        "writes to {prefix}.recombinants.txt.",
+    ]
+    _render_panel_image(body_f2, nf_dir / "fig6_2.png")
+
+    # ------------------------------------------------------------------
     # Markdown narrative.
     # ------------------------------------------------------------------
     _emit_component1_markdown(
@@ -1137,6 +1275,139 @@ genotypes. The split of responsibilities is deliberate and strict:
 `gtg-ped-map` writes only letters and only at informative sites, while
 `gtg-concordance` is the sole place where letter→allele correspondence
 is computed and written out.
+
+## 6. An equivalent pairwise-comparison algorithm
+
+The sequence of manipulations in §3-4 — carrier tagging, sibling
+backfill, swap-by-majority, block collapse, and flip reconciliation —
+is structured around per-site Latin labels whose meaning has to be
+reconciled across sites and across blocks. This section shows that
+exactly the same structural output can be produced by a simpler
+algorithm that never assigns Latin letters at all: it compares the
+alleles two kids inherited on the same slot, site by site, and reads
+the partition (and the recombinations) directly off the pattern of
+agreements and disagreements.
+
+**The algorithm.** Two steps.
+
+1. For every informative site `s` and every child `c`, recover
+   the 0/1 allele `c` inherited on the informative slot —
+   paternal at dad-informative sites, maternal at mom-informative
+   sites — directly from the VCF. At a dad-informative site dad
+   is het and mom is homozygous, so mom's contribution to `c`'s
+   genotype is fixed and `c`'s paternal allele is whichever of
+   dad's two alleles is *left over* after removing mom's
+   contribution from `c`'s genotype; symmetric at mom-informative
+   sites.
+2. For every pair of children `(i, j)`, compare those inherited
+   alleles site by site and record "=" (same allele) or "X"
+   (different alleles) at each informative site.
+
+![Figure 6.1 — Allele inherited by each kid on the informative slot](fig6_1.png)
+
+Figure 6.1 shows the result of step 1. Each entry is the raw 0/1
+allele value the kid inherited from that parent on that slot — read
+straight off the genotypes in Figure 2, nothing else. (Worked
+check at site 0: Dad `0/1`, Mom `1/1`, Kid1 `1/1`; mom donated a
+`1` to Kid1, so Kid1's paternal allele is the other copy of Kid1's
+genotype, which is also `1` — agreeing with Kid1 p = `1` in
+Figure 6.1.) Kid1 p at site 8 is `?` because Kid1's VCF genotype
+is missing there; every other informative slot is a concrete 0/1
+value.
+
+![Figure 6.2 — Pairwise agreement of kid gamete alleles](fig6_2.png)
+
+Figure 6.2 shows the pairwise grid for the three kid pairs. Read
+each row as "do these two kids share a parental homolog at this
+site?": `(Kid1,Kid2) p` is `X` at every dad-informative site, so
+Kid1 and Kid2 inherit two *different* dad homologs throughout.
+`(Kid1,Kid3) p` is `=` on sites 0-1 and `X` on sites 4-5, so
+Kid3 shares dad's homolog with Kid1 on the left half of the
+chromosome and with Kid2 on the right half — i.e., a recombination
+in dad's gamete to Kid3 between sites 1 and 4. This is the same
+structural fact that §4 encodes as an `A`→`B` transition in Kid3's
+paternal block labels.
+
+**Equivalence to the §3-4 pipeline.** Fix a dad-informative site
+`s`. Write `u` for dad's unique allele at `s` (the allele dad has
+that mom does not). For each child `c` define the *carrier
+indicator*
+
+    χ(c) = 1 iff c's genotype at s contains u.
+
+Because mom is homozygous for the non-`u` allele at `s`, mom cannot
+have donated `u` to any child. Hence:
+
+- `χ(c) = 1` ⇒ `c` inherited dad's `u`-carrying homolog at `s`.
+- `χ(c) = 0` ⇒ `c` inherited dad's other homolog at `s`.
+
+So `χ` is *exactly* the indicator of which physical dad-homolog `c`
+received at `s`, and the equivalence relation "kid `i` and kid `j`
+received the same dad-homolog at `s`" is exactly `χ(i) = χ(j)`.
+
+The pairwise algorithm works with the kid's inherited allele
+`a(c) ∈ {{u, common}}` at `s`. By the unique-allele rule,
+`a(c) = u` iff `χ(c) = 1` and `a(c) = common` iff `χ(c) = 0`. So
+
+    a(i) = a(j)   iff   χ(i) = χ(j).
+
+Therefore the pairwise `=` / `X` relation at site `s` is identical
+to the "same dad-homolog" equivalence relation — i.e., identical
+to the carrier partition written by
+[`track_alleles_through_pedigree`]({link(map_rs, 295)}). The
+symmetric argument with `u` and `common` swapped between mom and
+dad shows the same at mom-informative sites. The intermediate
+states in §3 — the carrier tagging of Figure 3.1, the non-carrier
+backfill of Figure 3.2, the swap-by-majority of Figure 3.3 — all
+*preserve* this partition; they only select which of the two Latin
+letters each site uses to name each of the two equivalence classes.
+[`perform_flips_in_place`]({link(map_rs, 702)}) then aligns those
+per-site letter choices into a consistent per-block chain, again
+without changing any partition. So the Latin-letter output that
+`gtg-ped-map` writes to disk encodes exactly the same per-site
+partition of children that the pairwise `=` / `X` grid encodes.
+
+**Recombinations.** The Rust pipeline reports a kid's recombination
+at a block boundary where that kid's Latin letter changes (e.g.,
+Kid3's paternal `A`→`B` in Figure 4). In the pairwise view, the
+same event is any site at which a pair-relation involving that kid
+flips: at Kid3's recombination, `(Kid1,Kid3) p` changes from `=` to
+`X` and `(Kid2,Kid3) p` changes from `X` to `=`, at the same
+boundary. For `n` children the `n-1` pair-relations with a fixed
+reference kid already carry the full partition — the remaining
+pairs are implied — and a block boundary is exactly a site at
+which any of those reference-pair relations flips. This is the
+same set of transitions that
+[`summarize_child_changes`]({link(map_rs, 673)}) emits to
+`{{prefix}}.recombinants.txt`.
+
+**Missing genotypes.** If `c`'s genotype at `s` is `./.`, the
+carrier indicator `χ(c)` is undefined, and so is the inherited
+allele `a(c)`: both algorithms lose that kid's information at
+that site. The §3 backfill resolves this for missing-genotype kids
+with a probabilistic default — assign the complement of whatever
+the typed siblings show — which in the pairwise view corresponds
+to guessing `=` or `X` for pairs involving the missing kid on the
+same probabilistic grounds. Neither algorithm recovers more
+information than the data contains; they differ only in whether
+that guess is committed to a Latin letter (Rust) or left as a `?`
+in the pair grid (pairwise). At site 8 of this simulation, that
+is why Kid1 reads `?` in Figure 6.1 while §3's backfill defaults
+Kid1 to `B`: the same missing information, handled two ways.
+
+**Why the pairwise view is useful as an explanation, not as a
+reimplementation.** The Rust pipeline keeps explicit Latin labels
+because that representation generalises cleanly to deeper
+pedigrees (where a grandchild's paternal slot has to be labelled
+by a letter its parent inherited from *its* parent, which is
+easier to express as a letter than as a pair comparison — see the
+[three-generation walkthrough](../three_generations/three_generations.md)).
+The pairwise-comparison view is a useful lens for reasoning about
+*what* the nuclear-family algorithm actually computes: an
+equivalence relation on children at every informative site,
+derived from a single allele lookup per (child, site), with
+everything else in §3-4 being machinery to serialise that
+equivalence relation into a flat per-site letter stream.
 """
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(content)
