@@ -614,10 +614,10 @@ def component_1_nuclear_family(out_dir: Path) -> None:
             pat_stage2, mat_stage2,
             [
                 "Backfill writes the parent's *other* letter (B for dad, D",
-                "for mom) into every '?' slot at an informative site —",
-                "including missing-genotype kids, recovered by sibling",
-                "elimination. Carriers still hold the first letter at every",
-                "site. The swap-by-majority step has not run yet.",
+                "for mom) into every '?' slot at an informative site. For",
+                "confirmed non-carriers this is a deduction; for missing-",
+                "genotype kids it is a probabilistic default. Carriers still",
+                "hold the first letter. Swap-by-majority has not run yet.",
             ],
         ),
         nf_dir / "fig3_2.png",
@@ -1030,8 +1030,9 @@ flips reconcile (§4).
 
 **Step 3c — skip families with one child** (the
 `children.len() > 1` guard at
-[`map_builder.rs:818`]({link(map_rs, 818)})), where there is no
-second sibling to provide the elimination signal.
+[`map_builder.rs:818`]({link(map_rs, 818)})). With a single child
+there is no sibling partition to exploit and the swap-by-majority
+step has no majority to measure.
 
 Because the depth-ordered walk in Step 1 always processes a parent
 before its children, [`get_iht_markers`]({link(map_rs, 274)}) (called
