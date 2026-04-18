@@ -206,7 +206,8 @@ NUM_SITES = 9
 # Sites 0,1,4,5,8: dad-informative (dad het, mom hom)
 # Sites 2,3,6,7:   mom-informative (mom het, dad hom)
 # Site 8 is dad-informative AND has Kid1's genotype missing in the VCF;
-# this is the case backfill_sibs handles by sibling elimination.
+# this is the case where backfill_sibs defaults the missing-genotype
+# kid to the non-carrier homolog (a probabilistic bet, not a deduction).
 HAP_DAD_ALPHA = "100110010"
 HAP_DAD_BETA  = "010101011"
 HAP_MOM_GAMMA = "101110010"
@@ -965,27 +966,40 @@ reconciling.
 
 **Step 3 — sibling backfill.**
 [`backfill_sibs`]({link(map_rs, 804)}) is then called for the same
-site. It exploits the fact that across siblings, both founder
-homologs must be represented somewhere (when a parent has more than
-one child). It runs in two sub-stages — a non-carrier fill (3a)
-followed by a swap-by-majority normalisation (3b) — plus a guard
-that disables it for one-child families.
+site. Step 2 already split siblings into two groups (carriers vs
+non-carriers) by which parental homolog they inherited; `backfill_sibs`
+names the non-carrier group with the parent's other letter, on the
+assumption that across a handful of siblings both founder homologs are
+likely to have been transmitted. It runs in two sub-stages — a
+non-carrier fill (3a) followed by a swap-by-majority normalisation (3b)
+— plus a [multi-child guard]({link(map_rs, 818)}) that disables it for
+one-child families.
 
-**Step 3a — backfill non-carriers.** For every sibling left as `?`
-after Step 2, write the parent's *other* letter (`B` for dad, `D`
-for mom). This works whether the sibling was a known non-carrier or
-had a *missing genotype* — the latter is recovered purely by sibling
-elimination, since once carriers are identified and only one founder
-homolog remains, that homolog must have gone to the untagged child.
+**Step 3a — backfill non-carriers**
+([fill loop at `map_builder.rs:848`]({link(map_rs, 848)})). For every
+sibling left as `?` after Step 2, write the parent's *other* letter
+(`B` for dad, `D` for mom). For a confirmed non-carrier this is a
+deduction — the kid's genotype lacks the parent's unique allele, so
+it must have inherited the homolog carrying the allele common to both
+parents. For a *missing-genotype* kid it is a default, not a deduction:
+the VCF observed neither allele, so nothing about that kid's own
+genotype pins its inheritance down, and the siblings' genotypes don't
+constrain it either. Writing `B` is a bet on the higher-probability
+outcome (that across several kids both homologs were transmitted) and
+will be wrong in the minority of cases where every sibling happened
+to inherit the same homolog; a wrong guess shows up later as a
+spurious recombination in that kid's block.
 
 ![Figure 3.2 — After backfill_sibs non-carrier fill (before swap)](fig3_2.png)
 
 Figure 3.2 shows the state at the end of Step 3a. Compared to
 Figure 3.1, every informative slot is now filled. The interesting
 column is site 8: Kid1's slot, which was `?` in Figure 3.1 because
-the VCF genotype is missing, is now `B` — recovered purely by the
-fact that Kid2 and Kid3 are tagged `A` carriers, so the only
-remaining dad homolog must have gone to Kid1. Crucially, in this
+the VCF genotype is missing, is now `B` — assigned under the
+assumption that Kid1 inherited the homolog *not* transmitted to the
+two tagged-`A` siblings (Kid2 and Kid3). This is a probabilistic
+default: Kid1 could in principle have inherited the same homolog as
+its siblings, in which case the `B` is wrong. Crucially, in this
 state the rule "carriers always hold the first letter" still holds
 strictly at every site.
 
