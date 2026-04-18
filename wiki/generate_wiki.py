@@ -854,10 +854,18 @@ homolog (the one carrying the allele common to both parents). So the
 children are partitioned into two groups by the carrier test. The
 two letters of the parent's pair are handed out one per group, but
 `track_alleles_through_pedigree` only writes a letter to the carrier
-group: it always picks the *first* letter of the parent's pair (`A`
-for dad-informative sites, `C` for mom-informative sites,
-[`map_builder.rs:333`]({link(map_rs, 333)})) and writes it to every
-carrier; the non-carriers are left as `?` and resolved in Step 3.
+group: at [`map_builder.rs:333`]({link(map_rs, 333)}) it calls
+[`find_valid_char`]({link(map_rs, 285)}), which returns the *first
+valid* (non-`?`, non-`.`) entry in the parent's own slot pair, and
+writes that letter to every carrier; the non-carriers are left as
+`?` and resolved in Step 3. For the nuclear family on this page both
+parents are founders, and [`Iht::new`]({link(iht_rs, 172)}) gave dad
+the pair `(A, B)` and mom the pair `(C, D)` — both slots pre-filled —
+so `find_valid_char` returns `A` at every dad-informative site and
+`C` at every mom-informative site. (In deeper pedigrees a non-founder
+parent may carry only one valid letter at a given site, in which
+case `find_valid_char` returns whichever of the two slots is
+populated; the same routine handles both cases.)
 
 This per-site choice of "first letter to carriers" is arbitrary in
 two senses. First, the parent's `(A, B)` pair was created at startup
