@@ -1192,7 +1192,7 @@ and the non-carriers Kid1 and Kid3 hold `B`; the swap sends Kid2 to
 on the maternal slot. So between Figure 3.2 and Figure 3.3 the
 "carrier always reads first letter" invariant is broken on
 purpose — a trade Step 3b makes so that labels stay consistent
-within a linkage block (see the scope discussion below).
+within a linkage block.
 
 The no-recombination assumption behind Step 3b's deduction is
 load-bearing: the claim that *the first letter tracks the same
