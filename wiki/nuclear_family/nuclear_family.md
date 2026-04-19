@@ -6,10 +6,10 @@ pedigree: a two-generation nuclear family with two founders (dad and
 mom) and three children. It complements the full
 [`methods.md`](../methods.md) write-up by zooming in on the per-site
 mechanics and pinning each figure to the exact Rust code that implements
-it. All line numbers refer to commit `bd90462`. Each function link is
+it. All line numbers refer to commit `9d28575`. Each function link is
 followed by its call site in the driver — `main()` in
-[`map_builder.rs`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L989) for `gtg-ped-map`, and `main()` in
-[`gtg_concordance.rs`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/gtg_concordance.rs#L315) for `gtg-concordance` —
+[`map_builder.rs`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L989) for `gtg-ped-map`, and `main()` in
+[`gtg_concordance.rs`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/gtg_concordance.rs#L315) for `gtg-concordance` —
 so you can step through the driver source in parallel with this
 walkthrough.
 
@@ -75,25 +75,25 @@ In this simulation:
   sites 3 and 4, so Kid3 carries dad's `α` homolog on sites 0–3 and
   dad's `β` homolog on sites 4–8.
 
-At program startup, [`Iht::new`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/iht.rs#L172) (driver calls at
-[`map_builder.rs:1059`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L1059) for the master template
-and [`map_builder.rs:1111`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L1111) for each VCF site)
+At program startup, [`Iht::new`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/iht.rs#L172) (driver calls at
+[`map_builder.rs:1059`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L1059) for the master template
+and [`map_builder.rs:1111`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L1111) for each VCF site)
 hands each founder a fresh pair of Latin letters — `(A,B)`, `(C,D)`,
 `(E,F)`, … — *without* associating any allele or any physical homolog
 with them. The letters are pure structural placeholders. The two
 `Iht::new` call sites play different roles: the first builds a
 **master template** that is never mutated — only its
-[`legend()`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/iht.rs#L330) is read, to print the column header
+[`legend()`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/iht.rs#L330) is read, to print the column header
 (`Dad:A|B Mom:C|D Kid1:?|? …`) at the top of the output files. The
 second allocates a fresh `local_iht` per VCF record that
-[`track_alleles_through_pedigree`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L295) then *mutates*
+[`track_alleles_through_pedigree`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L295) then *mutates*
 in place to record which founder letter each child inherited at that
 site. A per-site copy is needed rather than reusing the master because
 (i) each site's IHT vector is itself an output, so it cannot be shared
 across sites, and (ii) the master is hard-coded to
 `ChromType::Autosome`, whereas `local_iht` uses the chromosome's
 actual zygosity (autosome vs. chrX, decided at
-[`map_builder.rs:1086`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L1086)), which changes how
+[`map_builder.rs:1086`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L1086)), which changes how
 letters are laid out for males on chrX.
 
 The goal of `gtg-ped-map` is to recover exactly the Greek-labelled
@@ -118,9 +118,9 @@ file that declares who is whose parent). Two observations matter:
   informative-site test in the next section.
 
 Only biallelic SNVs enter the map; indels are filtered at read time via
-[`is_indel`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L501), invoked from the VCF-reading loop at
-[`map_builder.rs:164`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L164) inside `parse_vcf` (the
-driver calls `parse_vcf` at [`map_builder.rs:1092`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L1092)).
+[`is_indel`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L501), invoked from the VCF-reading loop at
+[`map_builder.rs:164`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L164) inside `parse_vcf` (the
+driver calls `parse_vcf` at [`map_builder.rs:1092`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L1092)).
 
 ## 3. Informative-site detection, letter tagging, and sibling backfill
 
@@ -128,20 +128,20 @@ This section describes what `gtg-ped-map` does at *each VCF record
 independently*, and shows the three intermediate states the per-site
 labels pass through (Figures 3.1, 3.2, 3.3 below). The two routines
 involved —
-[`track_alleles_through_pedigree`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L295) (driver call at
-[`map_builder.rs:1116`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L1116)) and
-[`backfill_sibs`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L804) (driver call at
-[`map_builder.rs:1122`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L1122)) — are called once per
+[`track_alleles_through_pedigree`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L295) (driver call at
+[`map_builder.rs:1116`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L1116)) and
+[`backfill_sibs`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L804) (driver call at
+[`map_builder.rs:1122`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L1122)) — are called once per
 site, and together produce the final per-site Latin labels shown in
 Figure 3.3. No
 across-site reasoning has happened yet at this stage.
 
 **Step 1 — informative-site detection.**
-[`track_alleles_through_pedigree`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L295) walks the
+[`track_alleles_through_pedigree`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L295) walks the
 pedigree in ancestor-first depth order and, for every
 `(parent, spouse)` pair, calls
-[`unique_allele`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L243) (from inside the walk at
-[`map_builder.rs:315`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L315)) to ask whether the parent
+[`unique_allele`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L243) (from inside the walk at
+[`map_builder.rs:315`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L315)) to ask whether the parent
 carries an allele that the spouse does not. Two cases can arise:
 
 - **Dad-informative** (dad het × mom hom): dad's unique allele tags
@@ -164,12 +164,12 @@ homolog (the one carrying the allele common to both parents). So the
 children are partitioned into two groups by the carrier test. The
 two letters of the parent's pair are handed out one per group, but
 `track_alleles_through_pedigree` only writes a letter to the carrier
-group: at [`map_builder.rs:333`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L333) it calls
-[`find_valid_char`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L285), which returns the *first
+group: at [`map_builder.rs:333`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L333) it calls
+[`find_valid_char`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L285), which returns the *first
 valid* (non-`?`, non-`.`) entry in the parent's own slot pair, and
 writes that letter to every carrier; the non-carriers are left as
 `?` and resolved in Step 3. For the nuclear family on this page both
-parents are founders, and [`Iht::new`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/iht.rs#L172) gave dad
+parents are founders, and [`Iht::new`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/iht.rs#L172) gave dad
 the pair `(A, B)` and mom the pair `(C, D)` — both slots pre-filled —
 so `find_valid_char` returns `A` at every dad-informative site and
 `C` at every mom-informative site. (In deeper pedigrees a non-founder
@@ -201,18 +201,18 @@ code (`perform_flips_in_place`, see §4, and ultimately
 reconciling.
 
 **Step 3 — sibling backfill.**
-[`backfill_sibs`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L804) is then called for the same
+[`backfill_sibs`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L804) is then called for the same
 site. Step 2 already split siblings into two groups (carriers vs
 non-carriers) by which parental homolog they inherited; `backfill_sibs`
 names the non-carrier group with the parent's other letter, on the
 assumption that across a handful of siblings both founder homologs are
 likely to have been transmitted. It runs in two sub-stages — a
 non-carrier fill (3a) followed by a swap-by-majority normalisation (3b)
-— plus a [multi-child guard](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L818) that disables it for
+— plus a [multi-child guard](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L818) that disables it for
 one-child families.
 
 **Step 3a — backfill non-carriers**
-([fill loop at `map_builder.rs:848`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L848)). For every
+([fill loop at `map_builder.rs:848`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L848)). For every
 sibling left as `?` after Step 2, write the parent's *other* letter
 (`B` for dad, `D` for mom). For a confirmed non-carrier this is a
 deduction — the kid's genotype lacks the parent's unique allele, so
@@ -240,7 +240,7 @@ state the rule "carriers always hold the first letter" still holds
 strictly at every site.
 
 **Step 3b — swap by majority**
-([`map_builder.rs:881`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L881)). The motivation: assume
+([`map_builder.rs:881`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L881)). The motivation: assume
 two neighboring informative sites are in perfect linkage — no
 recombination between them in any kid. Then *the same subset of
 kids* inherits a given parental homolog at both sites, so that
@@ -288,13 +288,13 @@ flips reconcile (§4).
 
 **Step 3c — skip families with one child** (the
 `children.len() > 1` guard at
-[`map_builder.rs:818`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L818)). With a single child
+[`map_builder.rs:818`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L818)). With a single child
 there is no sibling partition to exploit and the swap-by-majority
 step has no majority to measure.
 
 Because the depth-ordered walk in Step 1 always processes a parent
-before its children, [`get_iht_markers`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L274) (called
-from inside the walk at [`map_builder.rs:328`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L328))
+before its children, [`get_iht_markers`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L274) (called
+from inside the walk at [`map_builder.rs:328`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L328))
 reads the parent's already-assigned letters when propagating to the
 next generation, which is what makes the method look "recursive"
 across generations while being expressed as a single loop.
@@ -306,13 +306,31 @@ sites, `_` marks non-informative ones) sit directly above the kid
 rows, with every column aligned, so you can read each letter
 assignment straight up to the indicator that produced it. Each kid's
 paternal row (`p`) sits directly above its maternal row (`m`).
-Notice in Figure 3.3 that Kid2's paternal row is *not* a uniform run
-of one letter even though Kid2 inherits the same physical homolog
-(`β`) at every dad-informative site: the per-site `A`/`B` assignment
-shifts as the carrier group and its majority shift across sites.
-That apparent letter switching is the per-site arbitrariness
-introduced by Step 3b — it is not a real recombination signal, and
-§4's flip pass is what reconciles it.
+
+The no-recombination assumption behind Step 3b's deduction is
+load-bearing: the claim that *the first letter tracks the same
+physical homolog* holds only across sites that share a linkage
+block. In this pedigree the deduction is valid for the first four
+sites — paternal sites 0, 1 share the partition
+`{Kid1, Kid3 | Kid2}` with `A` naming dad's `α`, and maternal
+sites 2, 3 share `{Kid1, Kid3 | Kid2}` with `C` naming mom's
+`γ`. It breaks at site 4: Kid3 recombines on the paternal slot
+between sites 3 and 4, so the paternal partition at sites 4, 5, 8
+becomes `{Kid1 | Kid2, Kid3}`, and swap-by-majority re-pins
+paternal `A` to the new majority `{Kid2, Kid3}` — which now
+names dad's `β`, not `α`. That is why Kid2's paternal row in
+Figure 3.3 reads `B` at sites 0, 1 but `A` at sites 4, 5, 8 even
+though Kid2 inherits `β` throughout: the shift tracks a real
+crossover in Kid3, not a label arbitrariness in Kid2. The
+maternal slot has no crossover anywhere in this pedigree, so `C`
+stays pinned to `γ` across all mom-informative sites 2, 3, 6, 7.
+§4 turns these per-site partition labels into across-site
+haplotypes: [`collapse_identical_iht`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L385)
+groups each run of sites with the same partition into a block,
+and [`perform_flips_in_place`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L702) then chooses
+one `A`/`B` orientation per block so that consecutive blocks
+agree on every kid that did *not* recombine, isolating Kid3's
+crossover at the site 3–4 block boundary.
 
 ## 4. Block collapse, noise filtering, and flip reconciliation
 
@@ -323,22 +341,22 @@ children but, as flagged in §3, the letter convention can flip from
 site to site. Several Rust routines reconcile and clean the trace up
 before it is written to disk:
 
-1. [`collapse_identical_iht`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L385) (driver call at
-   [`map_builder.rs:1191`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L1191)) merges adjacent
+1. [`collapse_identical_iht`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L385) (driver call at
+   [`map_builder.rs:1191`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L1191)) merges adjacent
    sites with compatible letter assignments into blocks, while
-   [`fill_missing_values`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L617) (driver call at
-   [`map_builder.rs:1200`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L1200)) and
-   [`fill_missing_values_by_neighbor`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L540) (driver
-   call at [`map_builder.rs:1201`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L1201)) fill the
+   [`fill_missing_values`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L617) (driver call at
+   [`map_builder.rs:1200`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L1200)) and
+   [`fill_missing_values_by_neighbor`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L540) (driver
+   call at [`map_builder.rs:1201`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L1201)) fill the
    `.` gaps visible in Figure 3.3 from flanking blocks.
-2. [`count_matching_neighbors`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L935) (driver call at
-   [`map_builder.rs:1172`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L1172)) and
-   [`mask_child_alleles`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L970) (driver call at
-   [`map_builder.rs:1187`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L1187)) identify isolated
+2. [`count_matching_neighbors`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L935) (driver call at
+   [`map_builder.rs:1172`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L1172)) and
+   [`mask_child_alleles`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L970) (driver call at
+   [`map_builder.rs:1187`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L1187)) identify isolated
    runs shorter than `--run` (default 10 markers) and mask them back
    to `?` as likely sequencing noise, so that collapse does not
    invent spurious recombinations.
-3. [`perform_flips_in_place`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L702) enforces a
+3. [`perform_flips_in_place`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L702) enforces a
    consistent founder-letter orientation across blocks, since the
    two letters in a founder's pair are interchangeable within any
    single block. This is the routine that finally pins each block's
@@ -346,9 +364,9 @@ before it is written to disk:
    on every kid that did *not* recombine. The driver calls it three
    times — before and after block collapse, and again after gap
    fill — at
-   [`map_builder.rs:1135`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L1135),
-   [`map_builder.rs:1193`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L1193), and
-   [`map_builder.rs:1203`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L1203).
+   [`map_builder.rs:1135`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L1135),
+   [`map_builder.rs:1193`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L1193), and
+   [`map_builder.rs:1203`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L1203).
 
 After these steps, each kid's paternal and maternal slots are fully
 resolved — shown on separate rows per kid in Figure 4. Within each
@@ -356,8 +374,8 @@ block all three kids' labels agree on a single partition; across
 adjacent blocks, only the kid(s) that genuinely recombined change
 letter. Kid3's highlighted `A`→`B` transition on the paternal row is
 emitted to `{prefix}.recombinants.txt` by
-[`summarize_child_changes`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L673) (driver call at
-[`map_builder.rs:1228`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L1228)).
+[`summarize_child_changes`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L673) (driver call at
+[`map_builder.rs:1228`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L1228)).
 
 ## 5. Truth versus deduced
 
@@ -386,10 +404,10 @@ Reconstructing which allele each letter represents at every VCF site
 is the job of `gtg-concordance`, which will have its own wiki page
 once migrated. For every block, `gtg-concordance` enumerates the
 `2^F` founder-phase orientations produced by
-[`Iht::founder_phase_orientations`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/iht.rs#L492) (driver call
-at [`gtg_concordance.rs:256`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/gtg_concordance.rs#L256)), maps letters
-to VCF alleles via [`assign_genotypes`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/iht.rs#L442) (driver
-call at [`gtg_concordance.rs:267`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/gtg_concordance.rs#L267)), and
+[`Iht::founder_phase_orientations`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/iht.rs#L492) (driver call
+at [`gtg_concordance.rs:256`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/gtg_concordance.rs#L256)), maps letters
+to VCF alleles via [`assign_genotypes`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/iht.rs#L442) (driver
+call at [`gtg_concordance.rs:267`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/gtg_concordance.rs#L267)), and
 picks the orientation that minimises mismatches against the observed
 genotypes. The split of responsibilities is deliberate and strict:
 `gtg-ped-map` writes only letters and only at informative sites, while
@@ -474,14 +492,14 @@ The pairwise algorithm works with the kid's inherited allele
 Therefore the pairwise `=` / `X` relation at site `s` is identical
 to the "same dad-homolog" equivalence relation — i.e., identical
 to the carrier partition written by
-[`track_alleles_through_pedigree`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L295). The
+[`track_alleles_through_pedigree`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L295). The
 symmetric argument with `u` and `common` swapped between mom and
 dad shows the same at mom-informative sites. The intermediate
 states in §3 — the carrier tagging of Figure 3.1, the non-carrier
 backfill of Figure 3.2, the swap-by-majority of Figure 3.3 — all
 *preserve* this partition; they only select which of the two Latin
 letters each site uses to name each of the two equivalence classes.
-[`perform_flips_in_place`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L702) then aligns those
+[`perform_flips_in_place`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L702) then aligns those
 per-site letter choices into a consistent per-block chain, again
 without changing any partition. So the Latin-letter output that
 `gtg-ped-map` writes to disk encodes exactly the same per-site
@@ -498,7 +516,7 @@ reference kid already carry the full partition — the remaining
 pairs are implied — and a block boundary is exactly a site at
 which any of those reference-pair relations flips. This is the
 same set of transitions that
-[`summarize_child_changes`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/bd90462b6fb645472e52d8ef7d9eef38a2b23676/code/rust/src/bin/map_builder.rs#L673) emits to
+[`summarize_child_changes`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/9d28575a182a58891c5e446c12b8dc2c73a414c9/code/rust/src/bin/map_builder.rs#L673) emits to
 `{prefix}.recombinants.txt`.
 
 **Missing genotypes.** If `c`'s genotype at `s` is `./.`, the

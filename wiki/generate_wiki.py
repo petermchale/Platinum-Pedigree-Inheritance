@@ -1209,13 +1209,31 @@ sites, `_` marks non-informative ones) sit directly above the kid
 rows, with every column aligned, so you can read each letter
 assignment straight up to the indicator that produced it. Each kid's
 paternal row (`p`) sits directly above its maternal row (`m`).
-Notice in Figure 3.3 that Kid2's paternal row is *not* a uniform run
-of one letter even though Kid2 inherits the same physical homolog
-(`β`) at every dad-informative site: the per-site `A`/`B` assignment
-shifts as the carrier group and its majority shift across sites.
-That apparent letter switching is the per-site arbitrariness
-introduced by Step 3b — it is not a real recombination signal, and
-§4's flip pass is what reconciles it.
+
+The no-recombination assumption behind Step 3b's deduction is
+load-bearing: the claim that *the first letter tracks the same
+physical homolog* holds only across sites that share a linkage
+block. In this pedigree the deduction is valid for the first four
+sites — paternal sites 0, 1 share the partition
+`{{Kid1, Kid3 | Kid2}}` with `A` naming dad's `α`, and maternal
+sites 2, 3 share `{{Kid1, Kid3 | Kid2}}` with `C` naming mom's
+`γ`. It breaks at site 4: Kid3 recombines on the paternal slot
+between sites 3 and 4, so the paternal partition at sites 4, 5, 8
+becomes `{{Kid1 | Kid2, Kid3}}`, and swap-by-majority re-pins
+paternal `A` to the new majority `{{Kid2, Kid3}}` — which now
+names dad's `β`, not `α`. That is why Kid2's paternal row in
+Figure 3.3 reads `B` at sites 0, 1 but `A` at sites 4, 5, 8 even
+though Kid2 inherits `β` throughout: the shift tracks a real
+crossover in Kid3, not a label arbitrariness in Kid2. The
+maternal slot has no crossover anywhere in this pedigree, so `C`
+stays pinned to `γ` across all mom-informative sites 2, 3, 6, 7.
+§4 turns these per-site partition labels into across-site
+haplotypes: [`collapse_identical_iht`]({link(map_rs, 385)})
+groups each run of sites with the same partition into a block,
+and [`perform_flips_in_place`]({link(map_rs, 702)}) then chooses
+one `A`/`B` orientation per block so that consecutive blocks
+agree on every kid that did *not* recombine, isolating Kid3's
+crossover at the site 3–4 block boundary.
 
 ## 4. Block collapse, noise filtering, and flip reconciliation
 
