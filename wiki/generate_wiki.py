@@ -1147,10 +1147,19 @@ slots now carry each of the two letters. If the letter assigned to
 carriers (`A` or `C`) ends up in the *minority*, swap the two
 letters across all siblings so the majority class always carries
 the first letter. This is a deterministic per-site convention so
-that two sites whose carrier groups happen to be *the same set of
-kids* — but where one site has a 2-carrier majority and the other a
-1-carrier minority — nevertheless emerge with consistent labels,
-simplifying later block reconciliation.
+that two sites whose kids fall into *the same partition* — but where
+the carrier side is the majority at one site and the minority at the
+other — nevertheless emerge with consistent labels, simplifying later
+block reconciliation. The mom-informative sites in this simulation
+are exactly that example: at sites 2, 3, 6, 7 the three kids split
+the same way (`{{Kid1, Kid3 | Kid2}}`), but at site 2 the carrier
+side is `{{Kid1, Kid3}}` (majority) while at sites 3, 6, 7 the carrier
+is `{{Kid2}}` alone (minority). Compare Figure 3.2 and Figure 3.3 on
+the maternal row to see the effect: in Figure 3.2 site 2 reads
+`Kid1=C, Kid2=D, Kid3=C` while site 3 reads `Kid1=D, Kid2=C, Kid3=D`
+— same partition, incompatible letters. After the swap-by-majority
+flip at sites 3, 6, 7, Figure 3.3 shows all four sites uniformly as
+`Kid1=C, Kid2=D, Kid3=C`.
 
 ![Figure 3.3 — After backfill_sibs swap-by-majority (final per-site labels)](fig3_3.png)
 
