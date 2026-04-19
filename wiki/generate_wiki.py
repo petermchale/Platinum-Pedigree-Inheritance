@@ -1177,8 +1177,13 @@ flip at sites 3, 6, 7, Figure 3.3 shows all four sites uniformly as
 
 ![Figure 3.3 — After backfill_sibs swap-by-majority (final per-site labels)](fig3_3.png)
 
-Figure 3.3 shows the state at the end of Step 3b — the labels
-`gtg-ped-map` actually writes for this VCF record. Compared to
+Figure 3.3 shows the state at the end of Step 3b — the per-site
+labels that feed the across-site reconciliation in §4. They are
+*not* the marker-file output verbatim: a flip pass at
+[`map_builder.rs:1135`]({link(map_rs, 1135)}) runs between this
+state and the marker-file write at
+[`map_builder.rs:1142`]({link(map_rs, 1142)}), reconciling
+founder letters between consecutive sites. Compared to
 Figure 3.2, sites whose carrier group was the minority now have
 their entire row swapped. Site 1 of the paternal slot is the
 clearest example: in Figure 3.2 Kid2 (the lone carrier) holds `A`
@@ -1186,8 +1191,8 @@ and the non-carriers Kid1 and Kid3 hold `B`; the swap sends Kid2 to
 `B` and Kid1, Kid3 to `A`. The same flip occurs at sites 3, 6, 7
 on the maternal slot. So between Figure 3.2 and Figure 3.3 the
 "carrier always reads first letter" invariant is broken on
-purpose — this is the per-site letter arbitrariness that downstream
-flips reconcile (§4).
+purpose — a trade Step 3b makes so that labels stay consistent
+within a linkage block (see the scope discussion below).
 
 **Step 3c — skip families with one child** (the
 `children.len() > 1` guard at
