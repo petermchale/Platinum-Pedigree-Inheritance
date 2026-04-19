@@ -1143,15 +1143,28 @@ state the rule "carriers always hold the first letter" still holds
 strictly at every site.
 
 **Step 3b — swap by majority**
-([`map_builder.rs:881`]({link(map_rs, 881)})). Count how many sibling
-slots now carry each of the two letters. If the letter assigned to
-carriers (`A` or `C`) ends up in the *minority*, swap the two
-letters across all siblings so the majority class always carries
-the first letter. This is a deterministic per-site convention so
-that two sites whose kids fall into *the same partition* — but where
-the carrier side is the majority at one site and the minority at the
-other — nevertheless emerge with consistent labels, simplifying later
-block reconciliation. The mom-informative sites in this simulation
+([`map_builder.rs:881`]({link(map_rs, 881)})). The motivation: assume
+two neighboring informative sites are in perfect linkage — no
+recombination between them in any kid. Then *the same subset of
+kids* inherits a given parental homolog at both sites, so that
+subset has a fixed size across the two sites and is therefore the
+majority partition at both sites (or the minority at both). If we
+adopt the convention "the first letter (`A` or `C`) always labels
+the majority kid-partition," that letter tracks the same physical
+homolog across the two sites, independent of which allele sits on
+which homolog. Without this convention, the carrier-always-first
+rule from Step 3a can flip the letter between sites that share the
+same partition — because the carrier side is the majority at one
+site and the minority at the other — even though no recombination
+has occurred.
+
+The mechanics: count how many sibling slots now carry each of the
+two letters. If the letter assigned to carriers (`A` or `C`) ends
+up in the *minority*, swap the two letters across all siblings so
+the majority class always carries the first letter. This is a
+deterministic per-site convention that, under the no-recombination
+assumption above, produces consistent labels across linked sites
+and simplifies later block reconciliation. The mom-informative sites in this simulation
 are exactly that example: at sites 2, 3, 6, 7 the three kids split
 the same way (`{{Kid1, Kid3 | Kid2}}`), but at site 2 the carrier
 side is `{{Kid1, Kid3}}` (majority) while at sites 3, 6, 7 the carrier
