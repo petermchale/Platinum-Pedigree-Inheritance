@@ -1194,13 +1194,6 @@ on the maternal slot. So between Figure 3.2 and Figure 3.3 the
 purpose — a trade Step 3b makes so that labels stay consistent
 within a linkage block (see the scope discussion below).
 
-Because the depth-ordered walk in Step 1 always processes a parent
-before its children, [`get_iht_markers`]({link(map_rs, 274)}) (called
-from inside the walk at [`map_builder.rs:328`]({link(map_rs, 328)}))
-reads the parent's already-assigned letters when propagating to the
-next generation, which is what makes the method look "recursive"
-across generations while being expressed as a single loop.
-
 The no-recombination assumption behind Step 3b's deduction is
 load-bearing: the claim that *the first letter tracks the same
 physical homolog* holds only across sites that share a linkage
@@ -1225,6 +1218,13 @@ and [`perform_flips_in_place`]({link(map_rs, 702)}) then chooses
 one `A`/`B` orientation per block so that consecutive blocks
 agree on every kid that did *not* recombine, isolating Kid3's
 crossover at the site 3–4 block boundary.
+
+Because the depth-ordered walk in Step 1 always processes a parent
+before its children, [`get_iht_markers`]({link(map_rs, 274)}) (called
+from inside the walk at [`map_builder.rs:328`]({link(map_rs, 328)}))
+reads the parent's already-assigned letters when propagating to the
+next generation, which is what makes the method look "recursive"
+across generations while being expressed as a single loop.
 
 ## 4. Block collapse, noise filtering, and flip reconciliation
 
