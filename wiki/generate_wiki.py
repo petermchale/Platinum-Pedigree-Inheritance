@@ -1035,7 +1035,8 @@ involved —
 [`map_builder.rs:1116`]({link(map_rs, 1116)})) and
 [`backfill_sibs`]({link(map_rs, 804)}) (driver call at
 [`map_builder.rs:1122`]({link(map_rs, 1122)})) — are called once per
-site, and produce the per-site Latin labels rendered in Figure 3. No
+site, and together produce the final per-site Latin labels shown in
+Figure 3.3. No
 across-site reasoning has happened yet at this stage.
 
 **Step 1 — informative-site detection.**
@@ -1219,7 +1220,7 @@ before it is written to disk:
    [`map_builder.rs:1200`]({link(map_rs, 1200)})) and
    [`fill_missing_values_by_neighbor`]({link(map_rs, 540)}) (driver
    call at [`map_builder.rs:1201`]({link(map_rs, 1201)})) fill the
-   `.` gaps visible in Figure 3 from flanking blocks.
+   `.` gaps visible in Figure 3.3 from flanking blocks.
 2. [`count_matching_neighbors`]({link(map_rs, 935)}) (driver call at
    [`map_builder.rs:1172`]({link(map_rs, 1172)})) and
    [`mask_child_alleles`]({link(map_rs, 970)}) (driver call at
