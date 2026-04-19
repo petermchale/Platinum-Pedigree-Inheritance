@@ -1025,7 +1025,7 @@ Only biallelic SNVs enter the map; indels are filtered at read time via
 [`map_builder.rs:164`]({link(map_rs, 164)}) inside `parse_vcf` (the
 driver calls `parse_vcf` at [`map_builder.rs:1092`]({link(map_rs, 1092)})).
 
-## 3. Informative-site detection, letter tagging, and sibling backfill
+## 3. Informative-site detection, founder-letter tagging, and haplotype inference within a linkage block
 
 This section describes what `gtg-ped-map` does at *each VCF record
 independently*, and shows the three intermediate states the per-site
