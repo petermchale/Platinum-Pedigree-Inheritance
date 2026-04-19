@@ -1178,12 +1178,12 @@ flip at sites 3, 6, 7, Figure 3.3 shows all four sites uniformly as
 ![Figure 3.3 — After backfill_sibs swap-by-majority (final per-site labels)](fig3_3.png)
 
 Figure 3.3 shows the state at the end of Step 3b — the per-site
-labels that feed the across-site reconciliation in §4. They are
+labels that feed the across-site reconciliation in §4. (They are
 *not* the marker-file output verbatim: a flip pass at
 [`map_builder.rs:1135`]({link(map_rs, 1135)}) runs between this
 state and the marker-file write at
 [`map_builder.rs:1142`]({link(map_rs, 1142)}), reconciling
-founder letters between consecutive sites. Compared to
+founder letters between consecutive sites.) Compared to
 Figure 3.2, sites whose carrier group was the minority now have
 their entire row swapped. Site 1 of the paternal slot is the
 clearest example: in Figure 3.2 Kid2 (the lone carrier) holds `A`
