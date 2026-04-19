@@ -1194,10 +1194,9 @@ on the maternal slot. So between Figure 3.2 and Figure 3.3 the
 purpose — a trade Step 3b makes so that labels stay consistent
 within a linkage block.
 
-The no-recombination assumption behind Step 3b's deduction is
-load-bearing: the claim that *the first letter tracks the same
-physical homolog* holds only across sites that share a linkage
-block. In this pedigree the deduction is valid for the first four
+Step 3b pins the first letter to a single physical homolog, but
+only across a linkage block: once any kid recombines between two
+sites, the pin breaks at that boundary. In this pedigree the deduction is valid for the first four
 sites — paternal sites 0, 1 share the partition
 `{{Kid1, Kid3 | Kid2}}` with `A` naming dad's `α`, and maternal
 sites 2, 3 share `{{Kid1, Kid3 | Kid2}}` with `C` naming mom's
