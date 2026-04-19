@@ -1218,13 +1218,6 @@ one `A`/`B` orientation per block so that consecutive blocks
 agree on every kid that did *not* recombine, isolating Kid3's
 crossover at the site 3–4 block boundary.
 
-Because the depth-ordered walk in Step 1 always processes a parent
-before its children, [`get_iht_markers`]({link(map_rs, 274)}) (called
-from inside the walk at [`map_builder.rs:328`]({link(map_rs, 328)}))
-reads the parent's already-assigned letters when propagating to the
-next generation, which is what makes the method look "recursive"
-across generations while being expressed as a single loop.
-
 ## 4. Block collapse, noise filtering, and flip reconciliation
 
 ![Figure 4 — Collapsed blocks with recombination](fig4.png)
