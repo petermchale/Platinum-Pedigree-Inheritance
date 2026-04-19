@@ -1201,14 +1201,6 @@ reads the parent's already-assigned letters when propagating to the
 next generation, which is what makes the method look "recursive"
 across generations while being expressed as a single loop.
 
-Non-informative sites (both parents het, or both hom for the same
-allele) contribute nothing at this stage and are rendered as `.` in
-all three figures. The two indicator rows (`*` marks informative
-sites, `_` marks non-informative ones) sit directly above the kid
-rows, with every column aligned, so you can read each letter
-assignment straight up to the indicator that produced it. Each kid's
-paternal row (`p`) sits directly above its maternal row (`m`).
-
 The no-recombination assumption behind Step 3b's deduction is
 load-bearing: the claim that *the first letter tracks the same
 physical homolog* holds only across sites that share a linkage
