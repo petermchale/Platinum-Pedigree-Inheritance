@@ -1194,12 +1194,6 @@ on the maternal slot. So between Figure 3.2 and Figure 3.3 the
 purpose — a trade Step 3b makes so that labels stay consistent
 within a linkage block (see the scope discussion below).
 
-**Step 3c — skip families with one child** (the
-`children.len() > 1` guard at
-[`map_builder.rs:818`]({link(map_rs, 818)})). With a single child
-there is no sibling partition to exploit and the swap-by-majority
-step has no majority to measure.
-
 Because the depth-ordered walk in Step 1 always processes a parent
 before its children, [`get_iht_markers`]({link(map_rs, 274)}) (called
 from inside the walk at [`map_builder.rs:328`]({link(map_rs, 328)}))
