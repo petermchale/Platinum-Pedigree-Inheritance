@@ -864,6 +864,15 @@ def component_1_nuclear_family(out_dir: Path) -> None:
     _render_panel_image(body_f2, nf_dir / "fig6_2.png")
 
     # ------------------------------------------------------------------
+    # §7 self-contained noise-handling worked example.
+    # Uses its own 15-site simulation (independent of §1-6's 9-site
+    # simulation) so the left-hand paternal linkage block is long
+    # enough to contain a single-site genotype-miscall outlier that
+    # the mask step can visibly remove.
+    # ------------------------------------------------------------------
+    section7 = _section7_noise_figures(nf_dir)
+
+    # ------------------------------------------------------------------
     # Markdown narrative.
     # ------------------------------------------------------------------
     _emit_component1_markdown(
@@ -872,6 +881,7 @@ def component_1_nuclear_family(out_dir: Path) -> None:
         mom_info=mom_info,
         mismatches=mismatches,
         total_partitions=total_partitions,
+        section7=section7,
     )
 
     print(f"[component 1] Wrote panel PNGs + markdown to {nf_dir}")
@@ -884,6 +894,348 @@ def component_1_nuclear_family(out_dir: Path) -> None:
     )
 
 
+# ---------------------------------------------------------------------------
+# §7 self-contained noise-handling simulator.
+# ---------------------------------------------------------------------------
+#
+# Independent of the 9-site simulation used for §1-6. The left-hand paternal
+# linkage block is extended to 5 dad-informative sites so a single-site
+# genotype miscall (Kid3 at site 2) produces an isolated length-1 outlier
+# inside the block. With --run lowered to 2 for this demo, the
+# count_matching_neighbors + mask_child_alleles pair drops the outlier to
+# '?' before collapse, the collapse's '?'-as-wildcard merge absorbs the
+# masked site into the flanking block, and the gap-fill routines extend
+# each block across non-informative sites. Three panels (fig7_1/7_2/7_3)
+# show the state after flip-pass #1, after the mask, and after collapse +
+# gap-fill.
+
+_N7_NUM_SITES = 15
+
+# Dad-informative at sites 0,1,2,3,4,9,10,11,14 (left block of 5, then a
+# mom/non-informative stretch, then a right block of 3 + a trailing site).
+# Mom-informative at 5,6,12,13. Non-informative at 7,8.
+_N7_HAP_DAD_ALPHA = "101010000101001"
+_N7_HAP_DAD_BETA  = "010100000010000"
+_N7_HAP_MOM_GAMMA = "111111000111101"
+_N7_HAP_MOM_DELTA = "111110100111011"
+
+# Kid3 paternal crossover between sites 4 and 5 (α on 0-4, β on 5-14).
+# Kid1 genotype missing at site 14 (last dad-informative; preserves the
+# backfill-default demo from §3).
+_N7_KID_MISSING = {"Kid1": {14}, "Kid2": set(), "Kid3": set()}
+
+# Noise: at site 2 Kid3's true paternal-slot inheritance is α (allele 1)
+# and maternal-slot is γ (allele 1), so the true genotype is 1/1. A
+# sequencing / genotyping miscall flips this to 0/1, making Kid3 appear to
+# carry dad's unique allele at site 2 — a single-site partition outlier
+# inside the otherwise-linked left-hand block.
+_N7_NOISY_GT = {("Kid3", 2): "0/1"}
+
+# --run threshold for count_matching_neighbors, lowered from the default 10
+# so a 1-site outlier inside a 4-site block is visibly masked in this toy.
+_N7_MIN_RUN = 2
+
+
+def _section7_noise_figures(nf_dir: Path) -> Dict[str, object]:
+    """Emit fig7_1.png, fig7_2.png, fig7_3.png and return the metadata
+    the §7 markdown needs (site numbers, noise-site coordinates, etc.)."""
+    ns = _N7_NUM_SITES
+    kids = ["Kid1", "Kid2", "Kid3"]
+
+    dad_alpha = [int(c) for c in _N7_HAP_DAD_ALPHA]
+    dad_beta  = [int(c) for c in _N7_HAP_DAD_BETA]
+    mom_gamma = [int(c) for c in _N7_HAP_MOM_GAMMA]
+    mom_delta = [int(c) for c in _N7_HAP_MOM_DELTA]
+
+    dad_info = [
+        i for i in range(ns)
+        if dad_alpha[i] != dad_beta[i] and mom_gamma[i] == mom_delta[i]
+    ]
+    mom_info = [
+        i for i in range(ns)
+        if mom_gamma[i] != mom_delta[i] and dad_alpha[i] == dad_beta[i]
+    ]
+
+    def _pat(kid: str, site: int) -> int:
+        if kid == "Kid1":
+            return dad_alpha[site]
+        if kid == "Kid2":
+            return dad_beta[site]
+        return dad_alpha[site] if site <= 4 else dad_beta[site]
+
+    def _mat(kid: str, site: int) -> int:
+        if kid == "Kid1":
+            return mom_gamma[site]
+        if kid == "Kid2":
+            return mom_delta[site]
+        return mom_gamma[site]
+
+    def _gt(kid: str, site: int) -> str:
+        if site in _N7_KID_MISSING[kid]:
+            return "./."
+        if (kid, site) in _N7_NOISY_GT:
+            return _N7_NOISY_GT[(kid, site)]
+        a, b = _pat(kid, site), _mat(kid, site)
+        return f"{a}/{a}" if a == b else "0/1"
+
+    def _per_site_labels(
+        info: List[int],
+        phap_a: List[int], phap_b: List[int],
+        ohap_a: List[int], ohap_b: List[int],
+        first: str, second: str,
+    ) -> Dict[str, List[str]]:
+        lab = {k: ["?"] * ns for k in kids}
+        for site in info:
+            parent_alleles = {phap_a[site], phap_b[site]}
+            other_alleles  = {ohap_a[site], ohap_b[site]}
+            uniq = parent_alleles - other_alleles
+            if not uniq:
+                continue
+            u = next(iter(uniq))
+            pk: Dict[str, str] = {}
+            for k in kids:
+                gt = _gt(k, site)
+                if gt == "./.":
+                    pk[k] = "?"
+                    continue
+                ka = {int(gt[0]), int(gt[2])}
+                pk[k] = first if u in ka else "?"
+            if any(pk[k] == first for k in kids):
+                for k in kids:
+                    if pk[k] == "?":
+                        pk[k] = second
+            fc = sum(1 for k in kids if pk[k] == first)
+            sc = sum(1 for k in kids if pk[k] == second)
+            if fc < sc:
+                for k in kids:
+                    if pk[k] == first:
+                        pk[k] = second
+                    elif pk[k] == second:
+                        pk[k] = first
+            for k in kids:
+                lab[k][site] = pk[k]
+        return lab
+
+    pat_s3 = _per_site_labels(
+        dad_info, dad_alpha, dad_beta, mom_gamma, mom_delta, "A", "B",
+    )
+    mat_s3 = _per_site_labels(
+        mom_info, mom_gamma, mom_delta, dad_alpha, dad_beta, "C", "D",
+    )
+
+    def _flip_pass(
+        state: Dict[str, List[str]],
+        info: List[int],
+        letters: Tuple[str, str],
+    ) -> Dict[str, List[str]]:
+        a, b = letters
+        out = {k: list(state[k]) for k in kids}
+        prev: Optional[Dict[str, str]] = None
+        for site in info:
+            cur = {k: out[k][site] for k in kids}
+            if prev is not None:
+                flipped = {
+                    k: (b if cur[k] == a else a if cur[k] == b else cur[k])
+                    for k in kids
+                }
+                same = sum(1 for k in kids if cur[k] == prev[k])
+                flip = sum(1 for k in kids if flipped[k] == prev[k])
+                if flip > same:
+                    cur = flipped
+            for k in kids:
+                out[k][site] = cur[k]
+            prev = cur
+        return out
+
+    pat_f1 = _flip_pass(pat_s3, dad_info, ("A", "B"))
+    mat_f1 = _flip_pass(mat_s3, mom_info, ("C", "D"))
+
+    def _mask_runs(
+        state: Dict[str, List[str]],
+        info: List[int],
+        min_run: int,
+    ) -> Dict[str, List[str]]:
+        out = {k: list(state[k]) for k in kids}
+        for k in kids:
+            seq = [
+                (site, out[k][site])
+                for site in info
+                if out[k][site] not in ("?", ".")
+            ]
+            n = len(seq)
+            for i in range(n):
+                si, ai = seq[i]
+                before = 1
+                for j in range(i - 1, -1, -1):
+                    if seq[j][1] == ai:
+                        before += 1
+                    else:
+                        break
+                after = 1
+                for j in range(i + 1, n):
+                    if seq[j][1] == ai:
+                        after += 1
+                    else:
+                        break
+                if before < min_run and after < min_run:
+                    out[k][si] = "?"
+        return out
+
+    pat_masked = _mask_runs(pat_f1, dad_info, _N7_MIN_RUN)
+    mat_masked = _mask_runs(mat_f1, mom_info, _N7_MIN_RUN)
+
+    def _absorb_and_gap_fill(
+        state: Dict[str, List[str]],
+        info: List[int],
+    ) -> Dict[str, List[str]]:
+        """Emulate collapse_identical_iht's '?'-as-wildcard merge (which
+        absorbs a masked informative site into an agreeing flanking block),
+        followed by fill_missing_values_by_neighbor extending each block
+        across non-informative sites."""
+        out = {k: list(state[k]) for k in kids}
+        for k in kids:
+            for site in info:
+                if out[k][site] != "?":
+                    continue
+                prev_v = None
+                for ps in reversed(info):
+                    if ps >= site:
+                        continue
+                    if out[k][ps] not in ("?", "."):
+                        prev_v = out[k][ps]
+                        break
+                next_v = None
+                for ns_ in info:
+                    if ns_ <= site:
+                        continue
+                    if out[k][ns_] not in ("?", "."):
+                        next_v = out[k][ns_]
+                        break
+                if prev_v is not None and next_v == prev_v:
+                    out[k][site] = prev_v
+                elif prev_v is not None and next_v is None:
+                    out[k][site] = prev_v
+                elif next_v is not None and prev_v is None:
+                    out[k][site] = next_v
+        for k in kids:
+            last = None
+            for i in range(ns):
+                if out[k][i] not in ("?", "."):
+                    last = out[k][i]
+                elif last is not None:
+                    out[k][i] = last
+            last = None
+            for i in range(ns - 1, -1, -1):
+                if out[k][i] not in ("?", "."):
+                    last = out[k][i]
+                elif last is not None:
+                    out[k][i] = last
+        return out
+
+    pat_final = _absorb_and_gap_fill(pat_masked, dad_info)
+    mat_final = _absorb_and_gap_fill(mat_masked, mom_info)
+
+    row_prefix_width_7 = len("  Kid1 p:    ")
+
+    def _mark_sites() -> str:
+        marks = ["_"] * ns
+        for s in dad_info:
+            marks[s] = "*"
+        for s in mom_info:
+            marks[s] = "+"
+        return (" " * row_prefix_width_7) + " ".join(marks)
+
+    def _slot_display(
+        state: Dict[str, List[str]], info: List[int]
+    ) -> Dict[str, List[str]]:
+        rows: Dict[str, List[str]] = {}
+        for k in kids:
+            row = []
+            for i in range(ns):
+                v = state[k][i]
+                if i not in info and v == "?":
+                    row.append(".")
+                else:
+                    row.append(v)
+            rows[k] = row
+        return rows
+
+    def _build_body(
+        title: str,
+        legend_lines: List[str],
+        state_pat: Dict[str, List[str]],
+        state_mat: Dict[str, List[str]],
+    ) -> List[str]:
+        pat_disp = _slot_display(state_pat, dad_info)
+        mat_disp = _slot_display(state_mat, mom_info)
+        body = [title, ""]
+        body.extend(legend_lines)
+        body += [
+            "",
+            _mark_sites() + "   * = dad-inf, + = mom-inf",
+        ]
+        for k in kids:
+            body.append(f"  {k} p:    " + " ".join(pat_disp[k]))
+            body.append(f"  {k} m:    " + " ".join(mat_disp[k]))
+        return body
+
+    _render_panel_image(
+        _build_body(
+            "Figure 7.1 — After perform_flips_in_place #1 "
+            "(state written to the markers file)",
+            [
+                "Non-recombinant kids hold the same letter across adjacent",
+                "sites. Kid3's miscalled genotype at site 2 shows up as a",
+                "length-1 'B' outlier in the left-hand paternal block.",
+            ],
+            pat_f1, mat_f1,
+        ),
+        nf_dir / "fig7_1.png",
+    )
+
+    _render_panel_image(
+        _build_body(
+            f"Figure 7.2 — After count_matching_neighbors + "
+            f"mask_child_alleles (--run={_N7_MIN_RUN})",
+            [
+                "Kid3's label at site 2 has fewer than --run identical",
+                "neighbors on both sides, so it is masked to '?'. All other",
+                "labels survive — the mask is per-kid-per-slot.",
+            ],
+            pat_masked, mat_masked,
+        ),
+        nf_dir / "fig7_2.png",
+    )
+
+    _render_panel_image(
+        _build_body(
+            "Figure 7.3 — After collapse_identical_iht + "
+            "fill_missing_values_by_neighbor + perform_flips_in_place #3",
+            [
+                "Collapse's '?'-wildcard merge absorbs site 2 into the",
+                "flanking block (Kid3 now reads 'A' there). Gap-fill extends",
+                "each block across the non-informative sites. The surviving",
+                "A -> B transition on Kid3's paternal row between sites 4",
+                "and 5 is the real recombination.",
+            ],
+            pat_final, mat_final,
+        ),
+        nf_dir / "fig7_3.png",
+    )
+
+    return {
+        "num_sites": ns,
+        "dad_info": dad_info,
+        "mom_info": mom_info,
+        "noise_kid": "Kid3",
+        "noise_site": 2,
+        "missing_kid": "Kid1",
+        "missing_site": 14,
+        "min_run": _N7_MIN_RUN,
+        "recomb_between": (4, 5),
+    }
+
+
 def _emit_component1_markdown(
     out_path: Path,
     *,
@@ -891,6 +1243,7 @@ def _emit_component1_markdown(
     mom_info: List[int],
     mismatches: int,
     total_partitions: int,
+    section7: Dict[str, object],
 ) -> None:
     """Write the Component-1 narrative that interleaves panel PNGs with
     prose explanations and Rust-source permalinks.
@@ -1220,7 +1573,7 @@ one `A`/`B` orientation per block so that consecutive blocks
 agree on every kid that did *not* recombine, isolating Kid3's
 crossover at the site 3–4 block boundary.
 
-## 4. Expanding linkage blocks by minimizing recombinants, and removing noise
+## 4. Expanding linkage blocks by minimizing recombinants
 
 ![Figure 4 — Linkage blocks after minimum-recombinants reconciliation](fig4.png)
 
@@ -1263,33 +1616,6 @@ extend each block across the `.` gaps (non-informative sites)
 from flanking blocks, so block extent is reported in physical
 coordinates.
 
-Noise filtering protects the parsimony argument.
-[`count_matching_neighbors`]({link(map_rs, 935)}) (driver call at
-[`map_builder.rs:1172`]({link(map_rs, 1172)})) and
-[`mask_child_alleles`]({link(map_rs, 970)}) (driver call at
-[`map_builder.rs:1187`]({link(map_rs, 1187)})) find isolated runs
-shorter than `--run` (default 10 markers) and mask them back to
-`?` before collapse. Without this guard, a short mis-called
-stretch would look like two back-to-back real boundaries, forcing
-the parsimony rule to emit spurious recombinations.
-
-The driver calls `perform_flips_in_place` three times, each with
-a distinct role. The first call (per-site, at
-[`map_builder.rs:1135`]({link(map_rs, 1135)})) runs parsimony on
-the §3 output and produces the labels the marker file records.
-The second (after noise-masking and collapse, at
-[`map_builder.rs:1193`]({link(map_rs, 1193)})) re-runs parsimony
-on the cleaner, coarser per-block view — short noisy runs no
-longer distort the mismatch counts, and block-to-block
-comparisons can resolve cases that were ambiguous at single-site
-resolution. The third (after gap-fill, at
-[`map_builder.rs:1203`]({link(map_rs, 1203)})) re-integrates the
-consensus labels that `fill_missing_values` and
-`fill_missing_values_by_neighbor` write into previously-`?`
-slots; those fills can disagree with the block's current
-orientation, so a final parsimony pass is needed before the iht
-file is written.
-
 After these steps, each kid's paternal and maternal slots are
 fully resolved — shown on separate rows per kid in Figure 4.
 Within each block all three kids' labels agree on a single
@@ -1298,6 +1624,16 @@ recombined change letter. Kid3's highlighted `A`→`B` transition
 on the paternal row is emitted to `{{prefix}}.recombinants.txt`
 by [`summarize_child_changes`]({link(map_rs, 673)}) (driver call
 at [`map_builder.rs:1228`]({link(map_rs, 1228)})).
+
+The parsimony argument above assumes every per-site partition is
+real. Genotyping noise breaks that assumption by flipping one
+kid's carrier status at a single site — a spurious outlier that
+would otherwise force parsimony to emit two back-to-back
+"recombinations". §7 walks through how
+[`count_matching_neighbors`]({link(map_rs, 935)}) and
+[`mask_child_alleles`]({link(map_rs, 970)}) filter these out, and
+where the driver's three `perform_flips_in_place` calls sit
+around the mask, collapse, and gap-fill steps.
 
 ## 5. Truth versus deduced
 
@@ -1468,6 +1804,94 @@ equivalence relation on children at every informative site,
 derived from a single allele lookup per (child, site), with
 everything else in §3-4 being machinery to serialise that
 equivalence relation into a flat per-site letter stream.
+
+## 7. Handling genotyping noise
+
+§4 assumes every per-site partition is a real partition. A single
+miscalled genotype breaks that assumption: flipping one kid's
+carrier status at one site replaces the true partition with a
+spurious one, and — without further work — parsimony would emit
+two back-to-back "recombinations" around the outlier.
+
+To show the machinery that catches this, §7 switches to a larger
+self-contained simulation: {section7["num_sites"]} sites with dad-informative
+sites at `{section7["dad_info"]}` and mom-informative sites at
+`{section7["mom_info"]}`. Kid3's paternal homolog recombines between
+sites {section7["recomb_between"][0]} and {section7["recomb_between"][1]};
+{section7["missing_kid"]}'s genotype is missing at site
+{section7["missing_site"]} (the same backfill-default case as §3). The
+new ingredient is a single miscalled genotype at site
+{section7["noise_site"]}: {section7["noise_kid"]}'s true genotype there
+is 1/1 but the VCF reports 0/1, so {section7["noise_kid"]} appears to
+carry dad's unique allele — a spurious partition outlier inside an
+otherwise-linked block.
+
+**Figure 7.1 — after the first flip pass.** The state below is
+what [`perform_flips_in_place`]({link(map_rs, 702)}) (driver call
+at [`map_builder.rs:1135`]({link(map_rs, 1135)})) produces on the
+§3 output, and what the marker-file write at
+[`map_builder.rs:1142`]({link(map_rs, 1142)}) records.
+
+![Figure 7.1 — After perform_flips_in_place #1](fig7_1.png)
+
+{section7["noise_kid"]}'s paternal row reads `A A B A A` across
+the left-hand block: the `B` at site {section7["noise_site"]} is
+the noise outlier. Left unmasked, it would look like two adjacent
+recombinations in {section7["noise_kid"]} — one into the outlier,
+one out — and `{{prefix}}.recombinants.txt` would report both.
+
+**Figure 7.2 — after noise masking.**
+[`count_matching_neighbors`]({link(map_rs, 935)}) (driver call at
+[`map_builder.rs:1172`]({link(map_rs, 1172)})) walks each kid's
+per-slot sequence of non-`?` labels and flags every position
+whose contiguous run of identical labels has fewer than `--run`
+neighbors on both sides. (Default is `--run`=10; this demo uses
+`--run`={section7["min_run"]} so a length-1 outlier inside a
+4-site run is visibly isolated.)
+[`mask_child_alleles`]({link(map_rs, 970)}) (driver call at
+[`map_builder.rs:1187`]({link(map_rs, 1187)})) writes `?` at
+every flagged position.
+
+![Figure 7.2 — After mask_child_alleles](fig7_2.png)
+
+Only {section7["noise_kid"]}'s paternal label at site
+{section7["noise_site"]} meets the threshold. The mask is
+per-kid-per-slot, so {section7["noise_kid"]}'s maternal row and
+the other kids' paternal rows at site {section7["noise_site"]}
+are untouched.
+
+**Figure 7.3 — after collapse, gap-fill, and the remaining two
+flip passes.** [`collapse_identical_iht`]({link(map_rs, 385)})
+(driver call at [`map_builder.rs:1191`]({link(map_rs, 1191)}))
+merges adjacent sites whose labels agree, treating `?` as a
+wildcard (see [`can_merge_families`]({link(map_rs, 466)})). The
+masked site at {section7["noise_site"]} is absorbed into the
+flanking `A A A A` block:
+[`merge_family_maps`]({link(map_rs, 483)}) overwrites
+{section7["noise_kid"]}'s `?` with `A` as it merges. A second
+parsimony pass at
+[`map_builder.rs:1193`]({link(map_rs, 1193)}) then runs on this
+coarser per-block view — short noisy runs no longer distort its
+mismatch counts. [`fill_missing_values`]({link(map_rs, 617)})
+(driver call at [`map_builder.rs:1200`]({link(map_rs, 1200)}))
+and [`fill_missing_values_by_neighbor`]({link(map_rs, 540)})
+(driver call at [`map_builder.rs:1201`]({link(map_rs, 1201)}))
+extend each block across the non-informative `.` sites, and a
+third parsimony pass at
+[`map_builder.rs:1203`]({link(map_rs, 1203)}) re-integrates
+those consensus labels before
+[`map_builder.rs:1211`]({link(map_rs, 1211)}) writes the iht
+file.
+
+![Figure 7.3 — After collapse, gap-fill, and the third flip pass](fig7_3.png)
+
+The surviving `A`→`B` transition on {section7["noise_kid"]}'s
+paternal row between sites {section7["recomb_between"][0]} and
+{section7["recomb_between"][1]} is the real recombination; the
+spurious boundary at site {section7["noise_site"]} is gone.
+[`summarize_child_changes`]({link(map_rs, 673)}) emits it as the
+sole {section7["noise_kid"]} entry in
+`{{prefix}}.recombinants.txt`.
 """
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(content)
