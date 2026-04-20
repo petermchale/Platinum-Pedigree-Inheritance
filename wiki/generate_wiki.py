@@ -1683,136 +1683,99 @@ through them against the state they modify.
 
 ## 5. An equivalent pairwise-comparison algorithm
 
-The sequence of manipulations in §3-4 — carrier tagging, sibling
-backfill, swap-by-majority, block collapse, and flip reconciliation —
-is structured around per-site Latin labels whose meaning has to be
-reconciled across sites and across blocks. This section shows that
-exactly the same structural output can be produced by a simpler
-algorithm that never assigns Latin letters at all: it compares the
-alleles two kids inherited on the same slot, site by site, and reads
-the partition (and the recombinations) directly off the pattern of
-agreements and disagreements.
+The machinery in §3-4 routes every kid's inheritance through
+per-site Latin labels that §4 then stitches into blocks. The
+same structural output — who shares a parental homolog where,
+and where each kid recombines — falls out of a simpler two-step
+procedure that never assigns Latin letters at all.
 
 **The algorithm.** Two steps.
 
-1. For every informative site `s` and every child `c`, recover
-   the 0/1 allele `c` inherited on the informative slot —
-   paternal at dad-informative sites, maternal at mom-informative
-   sites — directly from the VCF. At a dad-informative site dad
-   is het and mom is homozygous, so mom's contribution to `c`'s
-   genotype is fixed and `c`'s paternal allele is whichever of
-   dad's two alleles is *left over* after removing mom's
-   contribution from `c`'s genotype; symmetric at mom-informative
-   sites.
+1. At every informative site, read each child's inherited allele
+   on the informative slot (paternal at dad-informative sites,
+   maternal at mom-informative sites) directly from the VCF: the
+   homozygous parent's contribution is fixed, so whichever allele
+   of the heterozygous parent remains after subtracting the
+   homozygous one from the child's genotype is what that child
+   inherited.
 2. For every pair of children `(i, j)`, compare those inherited
-   alleles site by site and record "=" (same allele) or "X"
-   (different alleles) at each informative site.
+   alleles site by site and record `=` (same allele) or `X`
+   (different alleles).
 
 ![Figure 5.1 — Allele inherited by each kid on the informative slot](fig5_1.png)
 
-Figure 5.1 shows the result of step 1. Each entry is the raw 0/1
-allele value the kid inherited from that parent on that slot — read
-straight off the genotypes in Figure 2, nothing else. (Worked
-check at site 0: Dad `0/1`, Mom `1/1`, Kid1 `1/1`; mom donated a
-`1` to Kid1, so Kid1's paternal allele is the other copy of Kid1's
-genotype, which is also `1` — agreeing with Kid1 p = `1` in
-Figure 5.1.) Kid1 p at site 8 is `?` because Kid1's VCF genotype
-is missing there; every other informative slot is a concrete 0/1
-value.
+Figure 5.1 shows the output of step 1. Each entry is the raw 0/1
+allele value the kid inherited from that parent on that slot —
+read straight off the genotypes in Figure 2, nothing else.
+(Worked check at site 0: Dad `0/1`, Mom `1/1`, Kid1 `1/1`; mom
+donated a `1`, so Kid1's paternal allele is the other copy of
+the genotype, which is also `1` — agreeing with Kid1 p = `1`.)
+Kid1 p at site 8 is `?` because Kid1's VCF genotype is missing.
 
 ![Figure 5.2 — Pairwise agreement of kid gamete alleles](fig5_2.png)
 
-Figure 5.2 shows the pairwise grid for the three kid pairs. Read
-each row as "do these two kids share a parental homolog at this
-site?": `(Kid1,Kid2) p` is `X` at every dad-informative site, so
-Kid1 and Kid2 inherit two *different* dad homologs throughout.
-`(Kid1,Kid3) p` is `=` on sites 0-1 and `X` on sites 4-5, so
-Kid3 shares dad's homolog with Kid1 on the left half of the
-chromosome and with Kid2 on the right half — i.e., a recombination
-in dad's gamete to Kid3 between sites 1 and 4. This is the same
-structural fact that §4 encodes as an `A`→`B` transition in Kid3's
-paternal block labels.
+Figure 5.2 shows the pairwise grid. Read each row as "do these
+two kids share a parental homolog at this site?":
+`(Kid1, Kid2) p` is `X` at every dad-informative site, so Kid1
+and Kid2 inherit two different dad homologs throughout.
+`(Kid1, Kid3) p` is `=` on sites 0-1 and `X` on sites 4-5, so
+Kid3 shares dad's homolog with Kid1 on the left half and with
+Kid2 on the right — a recombination in dad's gamete to Kid3
+between sites 1 and 4.
 
-**Equivalence to the §3-4 pipeline.** Fix a dad-informative site
-`s`. Write `u` for dad's unique allele at `s` (the allele dad has
-that mom does not). For each child `c` define the *carrier
-indicator*
+**From pairwise grid to founder-haplotype segregation.** The
+grid already determines which parental homolog each kid
+inherited where; Latin letters (`A`/`B` for dad's two homologs,
+`C`/`D` for mom's) are just names for those classes. Working
+per parent:
 
-    χ(c) = 1 iff c's genotype at s contains u.
+- A contiguous run of sites across which every pair-relation
+  involving that parent's slot holds constant is a single
+  linkage block. Within the block, hand out the parent's two
+  letters so that pairwise-`=` kids get the same letter and
+  pairwise-`X` kids get different letters.
+- A site at which any pair-relation flips (`=`→`X` or `X`→`=`)
+  is a block boundary, and the kid whose pair-relations flipped
+  is the recombinant there.
+- Across a block boundary the parent's two letters can be
+  swapped freely without changing any partition. Pick the
+  orientation that keeps the most kids on the same letter across
+  the boundary — every preserved letter is one fewer
+  recombination. That is exactly the parsimony rule §4's
+  `perform_flips_in_place` applies.
 
-Because mom is homozygous for the non-`u` allele at `s`, mom cannot
-have donated `u` to any child. Hence:
+Applied to Figure 5.2's paternal rows: `(Kid1, Kid2) p` is all
+`X`, so Kid1 and Kid2 carry different dad-letters throughout.
+`(Kid1, Kid3) p` is `=` on sites 0-1 and `X` on sites 4-8, so
+Kid1 and Kid3 share a dad-letter on the left block and differ
+on the right. The only boundary is between sites 1 and 4, and
+Kid3 is the lone kid whose pair-relations flip there — the
+recombinant. Assigning Kid1=`A`, Kid2=`B` on the left forces
+Kid3=`A` on the left and Kid3=`B` on the right, reproducing
+Fig 4.2's paternal labels exactly. The maternal side is
+even simpler — every maternal pair-relation is constant across
+all four mom-informative sites, so there is one block, no
+recombinations, and Kid1=Kid3=`C`, Kid2=`D`.
 
-- `χ(c) = 1` ⇒ `c` inherited dad's `u`-carrying homolog at `s`.
-- `χ(c) = 0` ⇒ `c` inherited dad's other homolog at `s`.
-
-So `χ` is *exactly* the indicator of which physical dad-homolog `c`
-received at `s`, and the equivalence relation "kid `i` and kid `j`
-received the same dad-homolog at `s`" is exactly `χ(i) = χ(j)`.
-
-The pairwise algorithm works with the kid's inherited allele
-`a(c) ∈ {{u, common}}` at `s`. By the unique-allele rule,
-`a(c) = u` iff `χ(c) = 1` and `a(c) = common` iff `χ(c) = 0`. So
-
-    a(i) = a(j)   iff   χ(i) = χ(j).
-
-Therefore the pairwise `=` / `X` relation at site `s` is identical
-to the "same dad-homolog" equivalence relation — i.e., identical
-to the carrier partition written by
-[`track_alleles_through_pedigree`]({link(map_rs, 295)}). The
-symmetric argument with `u` and `common` swapped between mom and
-dad shows the same at mom-informative sites. The intermediate
-states in §3 — the carrier tagging of Figure 3.1, the non-carrier
-backfill of Figure 3.2, the swap-by-majority of Figure 3.3 — all
-*preserve* this partition; they only select which of the two Latin
-letters each site uses to name each of the two equivalence classes.
-[`perform_flips_in_place`]({link(map_rs, 702)}) then aligns those
-per-site letter choices into a consistent per-block chain, again
-without changing any partition. So the Latin-letter output that
-`gtg-ped-map` writes to disk encodes exactly the same per-site
-partition of children that the pairwise `=` / `X` grid encodes.
-
-**Recombinations.** The Rust pipeline reports a kid's recombination
-at a block boundary where that kid's Latin letter changes (e.g.,
-Kid3's paternal `A`→`B` in Figure 4.2). In the pairwise view, the
-same event is any site at which a pair-relation involving that kid
-flips: at Kid3's recombination, `(Kid1,Kid3) p` changes from `=` to
-`X` and `(Kid2,Kid3) p` changes from `X` to `=`, at the same
-boundary. For `n` children the `n-1` pair-relations with a fixed
-reference kid already carry the full partition — the remaining
-pairs are implied — and a block boundary is exactly a site at
-which any of those reference-pair relations flips. This is the
-same set of transitions that
-[`summarize_child_changes`]({link(map_rs, 673)}) emits to
-`{{prefix}}.recombinants.txt`.
-
-**Missing genotypes.** If `c`'s genotype at `s` is `./.`, the
-carrier indicator `χ(c)` is undefined, and so is the inherited
-allele `a(c)`: both algorithms lose that kid's information at
-that site. The §3 backfill resolves this for missing-genotype kids
-with a probabilistic default — assign the complement of whatever
-the typed siblings show — which in the pairwise view corresponds
-to guessing `=` or `X` for pairs involving the missing kid on the
-same probabilistic grounds. Neither algorithm recovers more
-information than the data contains; they differ only in whether
-that guess is committed to a Latin letter (Rust) or left as a `?`
-in the pair grid (pairwise). At site 8 of this simulation, that
-is why Kid1 reads `?` in Figure 5.1 while §3's backfill defaults
-Kid1 to `B`: the same missing information, handled two ways.
-
-**Why the pairwise view is useful as an explanation, not as a
-reimplementation.** The Rust pipeline keeps explicit Latin labels
-because that representation generalises cleanly to deeper
-pedigrees (where a grandchild's paternal slot has to be labelled
-by a letter its parent inherited from *its* parent, which is
-easier to express as a letter than as a pair comparison — see the
+**Why the pairwise view is a lens, not a replacement.**
+`gtg-ped-map`'s output is structured as a **flat per-site
+letter stream**: `{{prefix}}.markers.txt` has one line per VCF
+record (chromosome, position, and every sample's pair of Latin
+letters at that site, with `?` and `.` where no letter was
+assigned), and `{{prefix}}.iht.txt` collapses runs of identical
+records into block rows. Neither file stores pair-relations; the
+flat stream plus a convention that `A` labels one of dad's
+homologs within each block is enough to reconstruct the full
+partition elsewhere. That letter-stream representation
+generalises cleanly to deeper pedigrees — a grandchild's
+paternal slot has to be labelled by whichever letter its parent
+inherited from *its* parent, which is easier to express as a
+letter than as a pair comparison (see the
 [three-generation walkthrough](../three_generations/three_generations.md)).
-The pairwise-comparison view is a useful lens for reasoning about
-*what* the nuclear-family algorithm actually computes: an
-equivalence relation on children at every informative site,
-derived from a single allele lookup per (child, site), with
-everything else in §3-4 being machinery to serialise that
-equivalence relation into a flat per-site letter stream.
+The pairwise grid is a two-generation shortcut that makes the
+underlying equivalence relation legible; the Rust machinery in
+§3-4 exists to serialise the same equivalence relation into the
+letter-stream format that scales.
 
 ## 6. Handling genotyping noise
 
