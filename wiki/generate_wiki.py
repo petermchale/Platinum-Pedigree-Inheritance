@@ -468,7 +468,7 @@ def _flip_blocks(
     letters: Tuple[str, str],
 ) -> Dict[str, List[str]]:
     """Compatibility wrapper: flip + collapse, returning the fully-
-    resolved per-site view used by downstream figures (§5, §6)."""
+    resolved per-site view used by downstream figures (§4.2)."""
     return _collapse_fill(_flip_only(per_site, info_sites, letters))
 
 
@@ -735,60 +735,8 @@ def component_1_nuclear_family(out_dir: Path) -> None:
         old_fig4.unlink()
 
     # ------------------------------------------------------------------
-    # Panel E — truth vs deduced, paternal and maternal on separate rows.
     # ------------------------------------------------------------------
-    def partition_match(truth_at_site: List[str], dedu_at_site: List[str]) -> bool:
-        """Two labelings agree as partitions iff for every kid pair, truth
-        and deduced agree on whether the two kids share a homolog."""
-        n = len(truth_at_site)
-        for i in range(n):
-            for j in range(i + 1, n):
-                t_eq = truth_at_site[i] == truth_at_site[j]
-                d_eq = dedu_at_site[i] == dedu_at_site[j]
-                if t_eq != d_eq:
-                    return False
-        return True
-
-    body_e = [
-        "Figure 5 — Truth vs deduced founder labels",
-        "",
-        "Truth uses Greek (physical homologs); deduced uses Latin",
-        "(per-block algorithm letters). They match if they induce the",
-        "same partition of kids per site.",
-        "",
-    ]
-    mismatches = 0
-    for k in kids:
-        truth = sim["kid_labels"][k]
-        pat_truth = [truth[i][0] for i in range(NUM_SITES)]
-        mat_truth = [truth[i][1] for i in range(NUM_SITES)]
-        pat_dedu = [paternal_blocks[k][i] for i in range(NUM_SITES)]
-        mat_dedu = [maternal_blocks[k][i] for i in range(NUM_SITES)]
-        body_e.append(f"  {k} p  T:  " + " ".join(pat_truth))
-        body_e.append(f"  {k} p  D:  " + " ".join(pat_dedu))
-        body_e.append(f"  {k} m  T:  " + " ".join(mat_truth))
-        body_e.append(f"  {k} m  D:  " + " ".join(mat_dedu))
-        body_e.append("")
-
-    # Partition mismatches: per site, per slot, across all 3 kids.
-    for i in range(NUM_SITES):
-        pat_truth_site = [sim["kid_labels"][k][i][0] for k in kids]
-        pat_dedu_site = [paternal_blocks[k][i] for k in kids]
-        mat_truth_site = [sim["kid_labels"][k][i][1] for k in kids]
-        mat_dedu_site = [maternal_blocks[k][i] for k in kids]
-        if not partition_match(pat_truth_site, pat_dedu_site):
-            mismatches += 1
-        if not partition_match(mat_truth_site, mat_dedu_site):
-            mismatches += 1
-    total_partitions = NUM_SITES * 2  # paternal + maternal slot per site
-    body_e.append(
-        f"Partition mismatches (paternal+maternal per site): "
-        f"{mismatches} / {total_partitions}"
-    )
-    _render_panel_image(body_e, nf_dir / "fig5.png")
-
-    # ------------------------------------------------------------------
-    # Panels F.1, F.2 — equivalent pairwise-comparison algorithm (§6).
+    # Panels F.1, F.2 — equivalent pairwise-comparison algorithm (§5).
     #
     # At every informative site we can recover each kid's inherited allele
     # on one of its two slots (paternal slot at dad-informative sites,
@@ -841,7 +789,7 @@ def component_1_nuclear_family(out_dir: Path) -> None:
     kid_pat_alleles = {k: _kid_slot_row(k, "p") for k in kids}
     kid_mat_alleles = {k: _kid_slot_row(k, "m") for k in kids}
 
-    # Figure 6.1 — inferred kid gamete alleles at informative sites.
+    # Figure 5.1 — inferred kid gamete alleles at informative sites.
     row_prefix_width_6 = len("  Kid1 p:    ")
 
     def mark_sites_6(dad_sites: List[int], mom_sites: List[int]) -> str:
@@ -853,7 +801,7 @@ def component_1_nuclear_family(out_dir: Path) -> None:
         return (" " * row_prefix_width_6) + " ".join(marks)
 
     body_f1 = [
-        "Figure 6.1 — Allele inherited by each kid on the informative slot",
+        "Figure 5.1 — Allele inherited by each kid on the informative slot",
         "",
         "At a dad-informative site (*) the entry is the 0/1 allele the kid",
         "inherited from dad on its paternal slot; at a mom-informative",
@@ -875,9 +823,9 @@ def component_1_nuclear_family(out_dir: Path) -> None:
         "",
         "Kid1 p at site 8 is '?' because Kid1's genotype is './.' there.",
     ]
-    _render_panel_image(body_f1, nf_dir / "fig6_1.png")
+    _render_panel_image(body_f1, nf_dir / "fig5_1.png")
 
-    # Figure 6.2 — pairwise kid-vs-kid agreement at informative sites.
+    # Figure 5.2 — pairwise kid-vs-kid agreement at informative sites.
     def _pair_row(
         allele_rows: Dict[str, List[str]],
         info_sites: List[int],
@@ -898,7 +846,7 @@ def component_1_nuclear_family(out_dir: Path) -> None:
 
     pairs = [("Kid1", "Kid2"), ("Kid1", "Kid3"), ("Kid2", "Kid3")]
     body_f2 = [
-        "Figure 6.2 — Pairwise agreement of kid gamete alleles",
+        "Figure 5.2 — Pairwise agreement of kid gamete alleles",
         "",
         "'=' means the two kids inherited the SAME parental homolog at",
         "that site; 'X' means they inherited DIFFERENT homologs; '?' =",
@@ -923,7 +871,7 @@ def component_1_nuclear_family(out_dir: Path) -> None:
         "signal Kid3's paternal recombination, the same event that §4",
         "writes to {prefix}.recombinants.txt.",
     ]
-    _render_panel_image(body_f2, nf_dir / "fig6_2.png")
+    _render_panel_image(body_f2, nf_dir / "fig5_2.png")
 
     # ------------------------------------------------------------------
     # §7 self-contained noise-handling worked example.
@@ -941,15 +889,12 @@ def component_1_nuclear_family(out_dir: Path) -> None:
         nf_dir / "nuclear_family.md",
         dad_info=dad_info,
         mom_info=mom_info,
-        mismatches=mismatches,
-        total_partitions=total_partitions,
         section7=section7,
     )
 
     print(f"[component 1] Wrote panel PNGs + markdown to {nf_dir}")
     print(f"[component 1] Dad-informative sites: {dad_info}")
     print(f"[component 1] Mom-informative sites: {mom_info}")
-    print(f"[component 1] Partition mismatches vs truth: {mismatches}")
     print(
         f"[component 1] Permalink example: "
         f"{permalink('code/rust/src/bin/map_builder.rs', 295, SHA)}"
@@ -960,14 +905,14 @@ def component_1_nuclear_family(out_dir: Path) -> None:
 # §7 self-contained noise-handling simulator.
 # ---------------------------------------------------------------------------
 #
-# Independent of the 9-site simulation used for §1-6. The left-hand paternal
+# Independent of the 9-site simulation used for §1-5. The left-hand paternal
 # linkage block is extended to 5 dad-informative sites so a single-site
 # genotype miscall (Kid3 at site 2) produces an isolated length-1 outlier
 # inside the block. With --run lowered to 2 for this demo, the
 # count_matching_neighbors + mask_child_alleles pair drops the outlier to
 # '?' before collapse, the collapse's '?'-as-wildcard merge absorbs the
 # masked site into the flanking block, and the gap-fill routines extend
-# each block across non-informative sites. Three panels (fig7_1/7_2/7_3)
+# each block across non-informative sites. Three panels (fig6_1/6_2/6_3)
 # show the state after flip-pass #1, after the mask, and after collapse +
 # gap-fill.
 
@@ -999,8 +944,8 @@ _N7_MIN_RUN = 2
 
 
 def _section7_noise_figures(nf_dir: Path) -> Dict[str, object]:
-    """Emit fig7_1.png, fig7_2.png, fig7_3.png and return the metadata
-    the §7 markdown needs (site numbers, noise-site coordinates, etc.)."""
+    """Emit fig6_1.png, fig6_2.png, fig6_3.png and return the metadata
+    the §6 markdown needs (site numbers, noise-site coordinates, etc.)."""
     ns = _N7_NUM_SITES
     kids = ["Kid1", "Kid2", "Kid3"]
 
@@ -1243,7 +1188,7 @@ def _section7_noise_figures(nf_dir: Path) -> Dict[str, object]:
 
     _render_panel_image(
         _build_body(
-            "Figure 7.1 — After perform_flips_in_place #1 "
+            "Figure 6.1 — After perform_flips_in_place #1 "
             "(state written to the markers file)",
             [
                 "Non-recombinant kids hold the same letter across adjacent",
@@ -1252,12 +1197,12 @@ def _section7_noise_figures(nf_dir: Path) -> Dict[str, object]:
             ],
             pat_f1, mat_f1,
         ),
-        nf_dir / "fig7_1.png",
+        nf_dir / "fig6_1.png",
     )
 
     _render_panel_image(
         _build_body(
-            f"Figure 7.2 — After count_matching_neighbors + "
+            f"Figure 6.2 — After count_matching_neighbors + "
             f"mask_child_alleles (--run={_N7_MIN_RUN})",
             [
                 "Kid3's label at site 2 has fewer than --run identical",
@@ -1266,12 +1211,12 @@ def _section7_noise_figures(nf_dir: Path) -> Dict[str, object]:
             ],
             pat_masked, mat_masked,
         ),
-        nf_dir / "fig7_2.png",
+        nf_dir / "fig6_2.png",
     )
 
     _render_panel_image(
         _build_body(
-            "Figure 7.3 — After collapse_identical_iht + "
+            "Figure 6.3 — After collapse_identical_iht + "
             "fill_missing_values_by_neighbor + perform_flips_in_place #3",
             [
                 "Collapse's '?'-wildcard merge absorbs site 2 into the",
@@ -1282,7 +1227,7 @@ def _section7_noise_figures(nf_dir: Path) -> Dict[str, object]:
             ],
             pat_final, mat_final,
         ),
-        nf_dir / "fig7_3.png",
+        nf_dir / "fig6_3.png",
     )
 
     return {
@@ -1303,8 +1248,6 @@ def _emit_component1_markdown(
     *,
     dad_info: List[int],
     mom_info: List[int],
-    mismatches: int,
-    total_partitions: int,
     section7: Dict[str, object],
 ) -> None:
     """Write the Component-1 narrative that interleaves panel PNGs with
@@ -1647,7 +1590,7 @@ to *real* recombinations.
 
 The load-bearing routine is
 [`perform_flips_in_place`]({link(map_rs, 702)}) (first driver
-call at [`map_builder.rs:1135`]({link(map_rs, 1135)}); §7
+call at [`map_builder.rs:1135`]({link(map_rs, 1135)}); §6
 describes the second and third calls). Its input is
 the per-site sequence of `IhtVec` records built by the VCF loop:
 each [`IhtVec`]({link(iht_rs, 139)}) pairs a `BedRecord`
@@ -1733,49 +1676,12 @@ collapse (at [`map_builder.rs:1193`]({link(map_rs, 1193)}) and
 toy these are all no-ops — collapse has already populated every
 slot, no `?`s remain for the fill routines to act on, and the
 second and third parsimony passes find no mismatches worth
-swapping. §7 uses a simulation with a miscalled genotype and
+swapping. §6 uses a simulation with a miscalled genotype and
 non-informative sites that do leave `?`s inside blocks, so
-these routines actually change state there; §7's prose walks
+these routines actually change state there; §6's prose walks
 through them against the state they modify.
 
-## 5. Truth versus deduced
-
-![Figure 5 — Truth vs deduced founder labels](fig5.png)
-
-The truth row uses Greek (physical homologs); the deduced row uses
-Latin (per-block algorithm letters). They cannot be compared
-character-by-character because, as discussed in §3 and §4, the
-algorithm guarantees the *partition* of children at each site — not
-which physical homolog each Latin letter corresponds to. Two
-labelings are therefore counted as agreeing at a site iff they induce
-the same partition of the three children: for every kid pair `(i,j)`,
-truth and deduced agree on whether kid *i* and kid *j* share a
-homolog. By that criterion the deduced trace matches the ground truth
-at every site ({mismatches} partition mismatches out of
-{total_partitions} partition slots = paternal + maternal per site),
-including Kid3's recombination at sites 3/4.
-
-The full output of `gtg-ped-map` for this chromosome is the set of
-blocks shown above plus the `recombinants.txt` entry for Kid3's
-switch — and critically, **nothing else**. The block map stores only
-founder letters; it does *not* store the 0/1 allele sequence of any
-haplotype.
-
-Reconstructing which allele each letter represents at every VCF site
-is the job of `gtg-concordance`, which will have its own wiki page
-once migrated. For every block, `gtg-concordance` enumerates the
-`2^F` founder-phase orientations produced by
-[`Iht::founder_phase_orientations`]({link(iht_rs, 492)}) (driver call
-at [`gtg_concordance.rs:256`]({link(concord_rs, 256)})), maps letters
-to VCF alleles via [`assign_genotypes`]({link(iht_rs, 442)}) (driver
-call at [`gtg_concordance.rs:267`]({link(concord_rs, 267)})), and
-picks the orientation that minimises mismatches against the observed
-genotypes. The split of responsibilities is deliberate and strict:
-`gtg-ped-map` writes only letters and only at informative sites, while
-`gtg-concordance` is the sole place where letter→allele correspondence
-is computed and written out.
-
-## 6. An equivalent pairwise-comparison algorithm
+## 5. An equivalent pairwise-comparison algorithm
 
 The sequence of manipulations in §3-4 — carrier tagging, sibling
 backfill, swap-by-majority, block collapse, and flip reconciliation —
@@ -1802,21 +1708,21 @@ agreements and disagreements.
    alleles site by site and record "=" (same allele) or "X"
    (different alleles) at each informative site.
 
-![Figure 6.1 — Allele inherited by each kid on the informative slot](fig6_1.png)
+![Figure 5.1 — Allele inherited by each kid on the informative slot](fig5_1.png)
 
-Figure 6.1 shows the result of step 1. Each entry is the raw 0/1
+Figure 5.1 shows the result of step 1. Each entry is the raw 0/1
 allele value the kid inherited from that parent on that slot — read
 straight off the genotypes in Figure 2, nothing else. (Worked
 check at site 0: Dad `0/1`, Mom `1/1`, Kid1 `1/1`; mom donated a
 `1` to Kid1, so Kid1's paternal allele is the other copy of Kid1's
 genotype, which is also `1` — agreeing with Kid1 p = `1` in
-Figure 6.1.) Kid1 p at site 8 is `?` because Kid1's VCF genotype
+Figure 5.1.) Kid1 p at site 8 is `?` because Kid1's VCF genotype
 is missing there; every other informative slot is a concrete 0/1
 value.
 
-![Figure 6.2 — Pairwise agreement of kid gamete alleles](fig6_2.png)
+![Figure 5.2 — Pairwise agreement of kid gamete alleles](fig5_2.png)
 
-Figure 6.2 shows the pairwise grid for the three kid pairs. Read
+Figure 5.2 shows the pairwise grid for the three kid pairs. Read
 each row as "do these two kids share a parental homolog at this
 site?": `(Kid1,Kid2) p` is `X` at every dad-informative site, so
 Kid1 and Kid2 inherit two *different* dad homologs throughout.
@@ -1891,7 +1797,7 @@ same probabilistic grounds. Neither algorithm recovers more
 information than the data contains; they differ only in whether
 that guess is committed to a Latin letter (Rust) or left as a `?`
 in the pair grid (pairwise). At site 8 of this simulation, that
-is why Kid1 reads `?` in Figure 6.1 while §3's backfill defaults
+is why Kid1 reads `?` in Figure 5.1 while §3's backfill defaults
 Kid1 to `B`: the same missing information, handled two ways.
 
 **Why the pairwise view is useful as an explanation, not as a
@@ -1908,7 +1814,7 @@ derived from a single allele lookup per (child, site), with
 everything else in §3-4 being machinery to serialise that
 equivalence relation into a flat per-site letter stream.
 
-## 7. Handling genotyping noise
+## 6. Handling genotyping noise
 
 §4 assumes every per-site partition is a real partition. A single
 miscalled genotype breaks that assumption: flipping one kid's
@@ -1916,7 +1822,7 @@ carrier status at one site replaces the true partition with a
 spurious one, and — without further work — parsimony would emit
 two back-to-back "recombinations" around the outlier.
 
-To show the machinery that catches this, §7 switches to a larger
+To show the machinery that catches this, §6 switches to a larger
 self-contained simulation: {section7["num_sites"]} sites with dad-informative
 sites at `{section7["dad_info"]}` and mom-informative sites at
 `{section7["mom_info"]}`. Kid3's paternal homolog recombines between
@@ -1929,13 +1835,13 @@ is 1/1 but the VCF reports 0/1, so {section7["noise_kid"]} appears to
 carry dad's unique allele — a spurious partition outlier inside an
 otherwise-linked block.
 
-**Figure 7.1 — after the first flip pass.** The state below is
+**Figure 6.1 — after the first flip pass.** The state below is
 what [`perform_flips_in_place`]({link(map_rs, 702)}) (driver call
 at [`map_builder.rs:1135`]({link(map_rs, 1135)})) produces on the
 §3 output, and what the marker-file write at
 [`map_builder.rs:1142`]({link(map_rs, 1142)}) records.
 
-![Figure 7.1 — After perform_flips_in_place #1](fig7_1.png)
+![Figure 6.1 — After perform_flips_in_place #1](fig6_1.png)
 
 {section7["noise_kid"]}'s paternal row reads `A A B A A` across
 the left-hand block: the `B` at site {section7["noise_site"]} is
@@ -1943,7 +1849,7 @@ the noise outlier. Left unmasked, it would look like two adjacent
 recombinations in {section7["noise_kid"]} — one into the outlier,
 one out — and `{{prefix}}.recombinants.txt` would report both.
 
-**Figure 7.2 — after noise masking.**
+**Figure 6.2 — after noise masking.**
 [`count_matching_neighbors`]({link(map_rs, 935)}) (driver call at
 [`map_builder.rs:1172`]({link(map_rs, 1172)})) walks each kid's
 per-slot sequence of non-`?` labels and flags every position
@@ -1955,7 +1861,7 @@ neighbors on both sides. (Default is `--run`=10; this demo uses
 [`map_builder.rs:1187`]({link(map_rs, 1187)})) writes `?` at
 every flagged position.
 
-![Figure 7.2 — After mask_child_alleles](fig7_2.png)
+![Figure 6.2 — After mask_child_alleles](fig6_2.png)
 
 Only {section7["noise_kid"]}'s paternal label at site
 {section7["noise_site"]} meets the threshold. The mask is
@@ -1963,7 +1869,7 @@ per-kid-per-slot, so {section7["noise_kid"]}'s maternal row and
 the other kids' paternal rows at site {section7["noise_site"]}
 are untouched.
 
-**Figure 7.3 — after collapse, gap-fill, and the remaining two
+**Figure 6.3 — after collapse, gap-fill, and the remaining two
 flip passes.** [`collapse_identical_iht`]({link(map_rs, 385)})
 (driver call at [`map_builder.rs:1191`]({link(map_rs, 1191)}))
 merges adjacent sites whose labels agree, treating `?` as a
@@ -1986,7 +1892,7 @@ those consensus labels before
 [`map_builder.rs:1211`]({link(map_rs, 1211)}) writes the iht
 file.
 
-![Figure 7.3 — After collapse, gap-fill, and the third flip pass](fig7_3.png)
+![Figure 6.3 — After collapse, gap-fill, and the third flip pass](fig6_3.png)
 
 The surviving `A`→`B` transition on {section7["noise_kid"]}'s
 paternal row between sites {section7["recomb_between"][0]} and
@@ -2801,8 +2707,8 @@ by `gtg-concordance`, covered in the
 
 ## 6. Pairwise-comparison view of the G2→G3 pass
 
-The nuclear-family page's [§6 pairwise-comparison
-algorithm](../nuclear_family/nuclear_family.md#6-an-equivalent-pairwise-comparison-algorithm)
+The nuclear-family page's [§5 pairwise-comparison
+algorithm](../nuclear_family/nuclear_family.md#5-an-equivalent-pairwise-comparison-algorithm)
 showed that the per-site Latin-letter machinery in §3-4 can be replaced
 by a simple allele comparison between pairs of kids. That view extends
 to the G2→G3 pass, but with one new ingredient: because Kid3 is a
