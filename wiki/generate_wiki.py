@@ -1726,8 +1726,10 @@ between sites 1 and 4.
 **From pairwise grid to founder-haplotype segregation.** The
 grid already determines which parental homolog each kid
 inherited where; Latin letters (`A`/`B` for dad's two homologs,
-`C`/`D` for mom's) are just names for those classes. Working
-per parent:
+`C`/`D` for mom's) are just names for those classes. Apply the
+following procedure independently to each parent's side — once
+over the paternal rows of Fig 5.2 using dad's `A`/`B`, and once
+over the maternal rows using mom's `C`/`D`:
 
 - A contiguous run of sites across which every pair-relation
   involving that parent's slot holds constant is a single
