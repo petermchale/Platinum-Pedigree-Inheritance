@@ -1575,8 +1575,6 @@ crossover at the site 3–4 block boundary.
 
 ## 4. Expanding linkage blocks by minimizing recombinants
 
-![Figure 4 — Linkage blocks after minimum-recombinants reconciliation](fig4.png)
-
 §3 delivers per-site partition labels whose convention is
 consistent only *within* a linkage block — §3.3 flagged that the
 `A`/`B` (or `C`/`D`) convention can flip across the boundary
@@ -1586,11 +1584,19 @@ the only block boundaries that survive in the output correspond
 to *real* recombinations.
 
 The load-bearing routine is
-[`perform_flips_in_place`]({link(map_rs, 702)}). Walking the
-vector in order, it compares each entry to its previous neighbor
-and, for each founder, picks the `A`/`B` orientation that
-minimizes [`count_mismatches`]({link(map_rs, 791)}) — the number
-of kid slots that differ across the boundary. A non-recombinant
+[`perform_flips_in_place`]({link(map_rs, 702)}). Its input is
+the per-site sequence of `IhtVec` records built by the VCF loop:
+each [`IhtVec`]({link(iht_rs, 139)}) pairs a `BedRecord`
+(chromosome + start/end coordinates of the site) with an
+[`Iht`]({link(iht_rs, 133)}) — the founder-letter map
+`(hap_a, hap_b)` per sample — plus a `count` of how many sites
+have been merged into it (1 before collapse, ≥1 after) and a
+table of per-sample non-`?` letter counts used for book-keeping.
+Walking this `Vec<IhtVec>` in genomic-coordinate order,
+`perform_flips_in_place` compares each record's `Iht` to the
+previous one and, for each founder, picks the `A`/`B`
+orientation that minimizes [`count_mismatches`]({link(map_rs, 791)})
+— the number of kid slots that differ across the boundary. A non-recombinant
 kid's letter should match across the boundary; a recombinant's
 must change. So minimizing mismatches is a parsimony rule: under
 the chosen orientation, the kids that still change letter across
@@ -1618,6 +1624,9 @@ coordinates.
 
 After these steps, each kid's paternal and maternal slots are
 fully resolved — shown on separate rows per kid in Figure 4.
+
+![Figure 4 — Linkage blocks after minimum-recombinants reconciliation](fig4.png)
+
 Within each block all three kids' labels agree on a single
 partition; across adjacent blocks, only the kid(s) that genuinely
 recombined change letter. Kid3's highlighted `A`→`B` transition
