@@ -407,17 +407,15 @@ def _per_site_parent_labels(
     return stage1, stage2, stage3
 
 
-def _flip_blocks(
+def _flip_only(
     per_site: Dict[str, List[str]],
     info_sites: List[int],
     letters: Tuple[str, str],
 ) -> Dict[str, List[str]]:
-    """Mimic perform_flips_in_place: walk informative sites left to right
-    and, whenever the next site's labels would agree better with the
-    running labels under an A<->B swap, flip them. Then propagate each
-    site's labels forward and backward to fill non-informative gaps
-    (mimicking gap-fill / collapse).
-    """
+    """Mimic the first perform_flips_in_place call on the per-site
+    pre_vector: walk informative sites left to right and, whenever the
+    next site's labels would agree better with the running labels under
+    a per-founder swap, flip them. Non-informative slots stay '?'."""
     kids = list(per_site.keys())
     out: Dict[str, List[str]] = {k: ["?"] * NUM_SITES for k in kids}
     a, b = letters
@@ -437,7 +435,17 @@ def _flip_blocks(
         for k in kids:
             out[k][s] = cur[k]
         prev = cur
+    return out
 
+
+def _collapse_fill(
+    flipped: Dict[str, List[str]],
+) -> Dict[str, List[str]]:
+    """Mimic collapse_identical_iht's '?'-wildcard merge: each slot's
+    '?' gets overwritten by the nearest flanking non-'?' letter as
+    adjacent IhtVec records are absorbed into the same block."""
+    kids = list(flipped.keys())
+    out: Dict[str, List[str]] = {k: list(flipped[k]) for k in kids}
     for k in kids:
         last = "?"
         for i in range(NUM_SITES):
@@ -451,8 +459,17 @@ def _flip_blocks(
                 last = out[k][i]
             else:
                 out[k][i] = last
-
     return out
+
+
+def _flip_blocks(
+    per_site: Dict[str, List[str]],
+    info_sites: List[int],
+    letters: Tuple[str, str],
+) -> Dict[str, List[str]]:
+    """Compatibility wrapper: flip + collapse, returning the fully-
+    resolved per-site view used by downstream figures (§5, §6)."""
+    return _collapse_fill(_flip_only(per_site, info_sites, letters))
 
 
 def component_1_nuclear_family(out_dir: Path) -> None:
@@ -491,8 +508,10 @@ def component_1_nuclear_family(out_dir: Path) -> None:
 
     paternal_deduced = pat_stage3
     maternal_deduced = mat_stage3
-    paternal_blocks = _flip_blocks(paternal_deduced, dad_info, ("A", "B"))
-    maternal_blocks = _flip_blocks(maternal_deduced, mom_info, ("C", "D"))
+    paternal_flipped = _flip_only(paternal_deduced, dad_info, ("A", "B"))
+    maternal_flipped = _flip_only(maternal_deduced, mom_info, ("C", "D"))
+    paternal_blocks = _collapse_fill(paternal_flipped)
+    maternal_blocks = _collapse_fill(maternal_flipped)
 
     nf_dir = out_dir / "nuclear_family"
     nf_dir.mkdir(parents=True, exist_ok=True)
@@ -645,32 +664,75 @@ def component_1_nuclear_family(out_dir: Path) -> None:
         old_fig3.unlink()
 
     # ------------------------------------------------------------------
-    # Panel D — collapsed blocks with paternal / maternal on separate
-    # rows, highlighting Kid3's A -> B transition.
+    # Panel D.1 — per-site view after perform_flips_in_place #1 (the
+    # marker-file state). Informative slots hold letters; '.' at slots
+    # where the parent is homozygous and no letter was written.
     # ------------------------------------------------------------------
-    body_d = [
-        "Figure 4 — Linkage blocks after minimum-recombinants reconciliation",
+    def _slot_display_s4(
+        state: Dict[str, List[str]], info_sites: List[int]
+    ) -> Dict[str, List[str]]:
+        rows: Dict[str, List[str]] = {}
+        for k in kids:
+            row = []
+            for i in range(NUM_SITES):
+                v = state[k][i]
+                if v == "?":
+                    row.append(".")
+                else:
+                    row.append(v)
+            rows[k] = row
+        return rows
+
+    body_d1 = [
+        "Figure 4.1 — After perform_flips_in_place #1 "
+        "(state written to the markers file)",
         "",
-        "Labels after perform_flips_in_place (parsimony) + collapse + gap-fill:",
+        "Parsimony has aligned letters across informative sites; '.' marks",
+        "a slot where the parent is homozygous and no letter was written.",
+        "Kid3's paternal A -> B between sites 1 and 4 is the real",
+        "recombination.",
+        "",
+    ]
+    pat_disp_flipped = _slot_display_s4(paternal_flipped, dad_info)
+    mat_disp_flipped = _slot_display_s4(maternal_flipped, mom_info)
+    for k in kids:
+        body_d1.append(f"  {k} p:    " + " ".join(pat_disp_flipped[k]))
+        body_d1.append(f"  {k} m:    " + " ".join(mat_disp_flipped[k]))
+    _render_panel_image(body_d1, nf_dir / "fig4_1.png")
+
+    # ------------------------------------------------------------------
+    # Panel D.2 — per-site view after collapse_identical_iht. The '?'
+    # wildcard merge absorbs each non-informative-for-slot entry into
+    # the flanking block, so every dot in Fig 4.1 gets its block's
+    # letter.
+    # ------------------------------------------------------------------
+    body_d2 = [
+        "Figure 4.2 — After collapse_identical_iht (linkage blocks)",
+        "",
+        "Each '.' in Fig 4.1 has been absorbed into its flanking block",
+        "via the '?'-wildcard merge: two blocks remain, [sites 0-3] and",
+        "[sites 4-8], with every slot fully populated. Kid3's paternal",
+        "A -> B between the two blocks is emitted to",
+        "{prefix}.recombinants.txt.",
         "",
     ]
     for k in kids:
-        pat_row = f"  {k} p:    " + " ".join(
-            paternal_blocks[k][i] for i in range(NUM_SITES)
+        body_d2.append(
+            f"  {k} p:    " + " ".join(
+                paternal_blocks[k][i] for i in range(NUM_SITES)
+            )
         )
-        mat_row = f"  {k} m:    " + " ".join(
-            maternal_blocks[k][i] for i in range(NUM_SITES)
+        body_d2.append(
+            f"  {k} m:    " + " ".join(
+                maternal_blocks[k][i] for i in range(NUM_SITES)
+            )
         )
-        body_d.append(pat_row)
-        body_d.append(mat_row)
-    body_d += [
-        "",
-        "Kid3's paternal A -> B between sites 3 and 4 is the lone",
-        "boundary letter change; Kid1 and Kid2 keep their letters,",
-        "extending the linkage block across them. This transition is",
-        "written to {prefix}.recombinants.txt.",
-    ]
-    _render_panel_image(body_d, nf_dir / "fig4.png")
+    _render_panel_image(body_d2, nf_dir / "fig4_2.png")
+
+    # Remove the single-panel fig4.png (superseded by fig4_1 / fig4_2).
+    old_fig4 = nf_dir / "fig4.png"
+    if old_fig4.exists():
+        old_fig4.unlink()
 
     # ------------------------------------------------------------------
     # Panel E — truth vs deduced, paternal and maternal on separate rows.
@@ -1622,45 +1684,56 @@ the recombinants, and there are as few of them as the data
 allows. This aligns with the biological prior that recombination
 is rare (far less than one crossover per Mb per meiosis) —
 recombinants end up as the minority kid-subset at each transition,
-and every non-recombinant kid's letter is preserved,
-extending the linkage block through them.
+and every non-recombinant kid's letter is preserved, extending
+the linkage block through them. Figure 4.1 shows the per-site
+state this first flip pass produces — the state that
+[`map_builder.rs:1142`]({link(map_rs, 1142)}) writes to the
+marker file.
 
+![Figure 4.1 — After perform_flips_in_place #1](fig4_1.png)
+
+Every dot in Figure 4.1 is a `?` in the corresponding `IhtVec`'s
+`Iht.children` slot: mom-informative sites leave paternal slots
+`?` (and vice versa) because
+[`track_alleles_through_pedigree`]({link(map_rs, 295)}) only
+writes letters where the parent of that slot is heterozygous.
 [`collapse_identical_iht`]({link(map_rs, 385)}) (driver call at
-[`map_builder.rs:1191`]({link(map_rs, 1191)})) then merges
-adjacent sites whose labels are now identical into a single
-block. After the flip pass has chosen a parsimonious convention,
-every remaining boundary between blocks corresponds to a genuine
-kid-letter change — a real recombination — and everything in
-between is one contiguous linkage block.
-[`fill_missing_values`]({link(map_rs, 617)}) (driver call at
-[`map_builder.rs:1200`]({link(map_rs, 1200)})) and
-[`fill_missing_values_by_neighbor`]({link(map_rs, 540)}) (driver
-call at [`map_builder.rs:1201`]({link(map_rs, 1201)})) further
-extend each block across the `.` gaps (non-informative sites)
-from flanking blocks, so block extent is reported in physical
-coordinates.
+[`map_builder.rs:1191`]({link(map_rs, 1191)})) then walks the
+per-site vector and, via
+[`can_merge_families`]({link(map_rs, 466)}) +
+[`merge_family_maps`]({link(map_rs, 483)}), merges every pair of
+adjacent records whose slot pairs are compatible under the
+`?`-as-wildcard rule. Each `?` in the accumulator gets
+overwritten by an incoming non-`?` letter as the merge
+proceeds, so the dots in Fig 4.1 get absorbed into flanking
+blocks and come out as the block's letter. A real recombination
+— a concrete letter-vs-letter disagreement between adjacent
+records — fails the compatibility test, terminates the merge,
+and becomes a surviving block boundary.
 
-After these steps, each kid's paternal and maternal slots are
-fully resolved — shown on separate rows per kid in Figure 4.
+![Figure 4.2 — After collapse_identical_iht (linkage blocks)](fig4_2.png)
 
-![Figure 4 — Linkage blocks after minimum-recombinants reconciliation](fig4.png)
+Two blocks remain, `[sites 0-3]` and `[sites 4-8]`; within each
+block every kid's slot pair is fully filled. Kid3's paternal
+`A`→`B` between them is the only surviving boundary letter
+change and is emitted to `{{prefix}}.recombinants.txt` by
+[`summarize_child_changes`]({link(map_rs, 673)}) (driver call at
+[`map_builder.rs:1228`]({link(map_rs, 1228)})).
 
-Within each block all three kids' labels agree on a single
-partition; across adjacent blocks, only the kid(s) that genuinely
-recombined change letter. Kid3's highlighted `A`→`B` transition
-on the paternal row is emitted to `{{prefix}}.recombinants.txt`
-by [`summarize_child_changes`]({link(map_rs, 673)}) (driver call
-at [`map_builder.rs:1228`]({link(map_rs, 1228)})).
-
-The parsimony argument above assumes every per-site partition is
-real. Genotyping noise breaks that assumption by flipping one
-kid's carrier status at a single site — a spurious outlier that
-would otherwise force parsimony to emit two back-to-back
-"recombinations". §7 walks through how
-[`count_matching_neighbors`]({link(map_rs, 935)}) and
-[`mask_child_alleles`]({link(map_rs, 970)}) filter these out, and
-where the driver's three `perform_flips_in_place` calls sit
-around the mask, collapse, and gap-fill steps.
+The driver makes two more `perform_flips_in_place` calls after
+collapse (at [`map_builder.rs:1193`]({link(map_rs, 1193)}) and
+[`map_builder.rs:1203`]({link(map_rs, 1203)})), sandwiched around
+[`fill_missing_values`]({link(map_rs, 617)}) and
+[`fill_missing_values_by_neighbor`]({link(map_rs, 540)}) (at
+[`map_builder.rs:1200`]({link(map_rs, 1200)}) and
+[`map_builder.rs:1201`]({link(map_rs, 1201)})). On this clean
+toy these are all no-ops — collapse has already populated every
+slot, no `?`s remain for the fill routines to act on, and the
+second and third parsimony passes find no mismatches worth
+swapping. §7 uses a simulation with a miscalled genotype and
+non-informative sites that do leave `?`s inside blocks, so
+these routines actually change state there; §7's prose walks
+through them against the state they modify.
 
 ## 5. Truth versus deduced
 
@@ -1792,7 +1865,7 @@ partition of children that the pairwise `=` / `X` grid encodes.
 
 **Recombinations.** The Rust pipeline reports a kid's recombination
 at a block boundary where that kid's Latin letter changes (e.g.,
-Kid3's paternal `A`→`B` in Figure 4). In the pairwise view, the
+Kid3's paternal `A`→`B` in Figure 4.2). In the pairwise view, the
 same event is any site at which a pair-relation involving that kid
 flips: at Kid3's recombination, `(Kid1,Kid3) p` changes from `=` to
 `X` and `(Kid2,Kid3) p` changes from `X` to `=`, at the same
