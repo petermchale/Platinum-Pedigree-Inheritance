@@ -1790,6 +1790,7 @@ unmasked, it would look like two adjacent recombinations in
 per slot, in three steps:
 
 1. [`collect_alleles_with_positions`]({link(map_rs, 916)})
+   (driver call at [`map_builder.rs:1170`]({link(map_rs, 1170)}))
    builds the per-(kid, slot) sequence of `(position, letter)`
    pairs by walking `pre_vector` and dropping every entry whose
    slot letter is `?`. One pair per informative site for that
