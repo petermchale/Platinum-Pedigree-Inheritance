@@ -873,41 +873,11 @@ def component_1_nuclear_family(out_dir: Path) -> None:
     ]
     _render_panel_image(body_f2, nf_dir / "fig5_2.png")
 
-    # Figure 5.3 — Latin-letter segregation deduced from Step 3 applied
-    # to the pairwise grid. Same letter content as Fig 4.2 (to make the
-    # equivalence explicit) but framed as the output of the pairwise
-    # algorithm, not of collapse_identical_iht.
-    body_f3 = [
-        "Figure 5.3 — Founder-haplotype segregation deduced from Step 3",
-        "",
-        "Applying Step 3 to Fig 5.2: on dad's side, (Kid1,Kid3) flips",
-        "'='->'X' and (Kid2,Kid3) flips 'X'->'=' between sites 1 and 4,",
-        "while (Kid1,Kid2) stays 'X'. Kid3 is the single kid common to",
-        "both flipped pairs: the recombinant. Mom's side has no flips,",
-        "so one block, no recombinations. The letters below fall out by",
-        "assigning pairwise-'=' kids the same letter and pairwise-'X'",
-        "kids different letters, per parent per block:",
-        "",
-        mark_sites_6(dad_info, mom_info)
-        + "   * = dad-informative, + = mom-informative",
-    ]
-    for k in kids:
-        body_f3.append(
-            f"  {k} p:    " + " ".join(
-                paternal_blocks[k][i] for i in range(NUM_SITES)
-            )
-        )
-        body_f3.append(
-            f"  {k} m:    " + " ".join(
-                maternal_blocks[k][i] for i in range(NUM_SITES)
-            )
-        )
-    body_f3 += [
-        "",
-        "This matches Fig 4.2 exactly — the pairwise grid plus Step 3",
-        "reproduces the output of perform_flips_in_place + collapse.",
-    ]
-    _render_panel_image(body_f3, nf_dir / "fig5_3.png")
+    # Remove the old fig5_3.png if it exists (no longer emitted; the
+    # equivalence with Fig 4.2 is stated in prose instead).
+    old_fig5_3 = nf_dir / "fig5_3.png"
+    if old_fig5_3.exists():
+        old_fig5_3.unlink()
 
     # ------------------------------------------------------------------
     # §7 self-contained noise-handling worked example.
@@ -1803,14 +1773,10 @@ recombinant. Assigning Kid1=`A`, Kid2=`B` on the left forces
 Kid3=`A` on the left and Kid3=`B` on the right. The maternal
 side is even simpler — every maternal pair-relation is constant
 across all four mom-informative sites, so there is one block,
-no recombinations, and Kid1=Kid3=`C`, Kid2=`D`.
-
-![Figure 5.3 — Founder-haplotype segregation deduced from Step 3](fig5_3.png)
-
-Figure 5.3 collects the letter assignments this procedure
-produces into the same per-site view used by Fig 4.2. The two
-are identical, which is the point: the pairwise grid plus Step 3
-reproduces Fig 4.2's output without ever running
+no recombinations, and Kid1=Kid3=`C`, Kid2=`D`. The letter
+assignment these rules produce matches Figure 4.2
+character-for-character: the pairwise grid plus Step 3
+reproduces §4's output without ever running
 `perform_flips_in_place` or `collapse_identical_iht`.
 
 **Why the pairwise view is a lens, not a replacement.**
