@@ -873,6 +873,42 @@ def component_1_nuclear_family(out_dir: Path) -> None:
     ]
     _render_panel_image(body_f2, nf_dir / "fig5_2.png")
 
+    # Figure 5.3 — Latin-letter segregation deduced from Step 3 applied
+    # to the pairwise grid. Same letter content as Fig 4.2 (to make the
+    # equivalence explicit) but framed as the output of the pairwise
+    # algorithm, not of collapse_identical_iht.
+    body_f3 = [
+        "Figure 5.3 — Founder-haplotype segregation deduced from Step 3",
+        "",
+        "Applying Step 3 to Fig 5.2: on dad's side, (Kid1,Kid3) flips",
+        "'='->'X' and (Kid2,Kid3) flips 'X'->'=' between sites 1 and 4,",
+        "while (Kid1,Kid2) stays 'X'. Kid3 is the single kid common to",
+        "both flipped pairs: the recombinant. Mom's side has no flips,",
+        "so one block, no recombinations. The letters below fall out by",
+        "assigning pairwise-'=' kids the same letter and pairwise-'X'",
+        "kids different letters, per parent per block:",
+        "",
+        mark_sites_6(dad_info, mom_info)
+        + "   * = dad-informative, + = mom-informative",
+    ]
+    for k in kids:
+        body_f3.append(
+            f"  {k} p:    " + " ".join(
+                paternal_blocks[k][i] for i in range(NUM_SITES)
+            )
+        )
+        body_f3.append(
+            f"  {k} m:    " + " ".join(
+                maternal_blocks[k][i] for i in range(NUM_SITES)
+            )
+        )
+    body_f3 += [
+        "",
+        "This matches Fig 4.2 exactly — the pairwise grid plus Step 3",
+        "reproduces the output of perform_flips_in_place + collapse.",
+    ]
+    _render_panel_image(body_f3, nf_dir / "fig5_3.png")
+
     # ------------------------------------------------------------------
     # §7 self-contained noise-handling worked example.
     # Uses its own 15-site simulation (independent of §1-6's 9-site
@@ -1686,10 +1722,11 @@ through them against the state they modify.
 The machinery in §3-4 routes every kid's inheritance through
 per-site Latin labels that §4 then stitches into blocks. The
 same structural output — who shares a parental homolog where,
-and where each kid recombines — falls out of a simpler two-step
-procedure that never assigns Latin letters at all.
+and where each kid recombines — falls out of a simpler three-
+step procedure that never runs `perform_flips_in_place` or
+`collapse_identical_iht`.
 
-**The algorithm.** Two steps.
+**The algorithm.** Three steps.
 
 1. At every informative site, read each child's inherited allele
    on the informative slot (paternal at dad-informative sites,
@@ -1701,6 +1738,8 @@ procedure that never assigns Latin letters at all.
 2. For every pair of children `(i, j)`, compare those inherited
    alleles site by site and record `=` (same allele) or `X`
    (different alleles).
+3. From the pairwise grid, deduce the founder-haplotype
+   segregation and recombinations (detailed below).
 
 ![Figure 5.1 — Allele inherited by each kid on the informative slot](fig5_1.png)
 
@@ -1714,22 +1753,22 @@ Kid1 p at site 8 is `?` because Kid1's VCF genotype is missing.
 
 ![Figure 5.2 — Pairwise agreement of kid gamete alleles](fig5_2.png)
 
-Figure 5.2 shows the pairwise grid. Read each row as "do these
-two kids share a parental homolog at this site?":
-`(Kid1, Kid2) p` is `X` at every dad-informative site, so Kid1
-and Kid2 inherit two different dad homologs throughout.
+Figure 5.2 shows the output of step 2, the pairwise grid. Read
+each row as "do these two kids share a parental homolog at this
+site?": `(Kid1, Kid2) p` is `X` at every dad-informative site,
+so Kid1 and Kid2 inherit two different dad homologs throughout.
 `(Kid1, Kid3) p` is `=` on sites 0-1 and `X` on sites 4-5, so
 Kid3 shares dad's homolog with Kid1 on the left half and with
 Kid2 on the right — a recombination in dad's gamete to Kid3
 between sites 1 and 4.
 
-**From pairwise grid to founder-haplotype segregation.** The
-grid already determines which parental homolog each kid
-inherited where; Latin letters (`A`/`B` for dad's two homologs,
-`C`/`D` for mom's) are just names for those classes. Apply the
-following procedure independently to each parent's side — once
-over the paternal rows of Fig 5.2 using dad's `A`/`B`, and once
-over the maternal rows using mom's `C`/`D`:
+**Step 3 in detail.** The grid already determines which parental
+homolog each kid inherited where; Latin letters (`A`/`B` for
+dad's two homologs, `C`/`D` for mom's) are just names for those
+classes. Apply the following procedure independently to each
+parent's side — once over the paternal rows of Fig 5.2 using
+dad's `A`/`B`, and once over the maternal rows using mom's
+`C`/`D`:
 
 - A contiguous run of sites across which every pair-relation
   involving that parent's slot holds constant is a single
@@ -1761,11 +1800,18 @@ Kid1 and Kid3 share a dad-letter on the left block and differ
 on the right. The only boundary is between sites 1 and 4, and
 Kid3 is the lone kid whose pair-relations flip there — the
 recombinant. Assigning Kid1=`A`, Kid2=`B` on the left forces
-Kid3=`A` on the left and Kid3=`B` on the right, reproducing
-Fig 4.2's paternal labels exactly. The maternal side is
-even simpler — every maternal pair-relation is constant across
-all four mom-informative sites, so there is one block, no
-recombinations, and Kid1=Kid3=`C`, Kid2=`D`.
+Kid3=`A` on the left and Kid3=`B` on the right. The maternal
+side is even simpler — every maternal pair-relation is constant
+across all four mom-informative sites, so there is one block,
+no recombinations, and Kid1=Kid3=`C`, Kid2=`D`.
+
+![Figure 5.3 — Founder-haplotype segregation deduced from Step 3](fig5_3.png)
+
+Figure 5.3 collects the letter assignments this procedure
+produces into the same per-site view used by Fig 4.2. The two
+are identical, which is the point: the pairwise grid plus Step 3
+reproduces Fig 4.2's output without ever running
+`perform_flips_in_place` or `collapse_identical_iht`.
 
 **Why the pairwise view is a lens, not a replacement.**
 `gtg-ped-map`'s output is structured as a **flat per-site
