@@ -1699,17 +1699,20 @@ Every dot in Figure 4.1 is a `?` in the corresponding `IhtVec`'s
 writes letters where the parent of that slot is heterozygous.
 [`collapse_identical_iht`]({link(map_rs, 385)}) (driver call at
 [`map_builder.rs:1191`]({link(map_rs, 1191)})) then walks the
-per-site vector and, via
-[`can_merge_families`]({link(map_rs, 466)}) +
-[`merge_family_maps`]({link(map_rs, 483)}), merges every pair of
-adjacent records whose slot pairs are compatible under the
-`?`-as-wildcard rule. Each `?` in the accumulator gets
-overwritten by an incoming non-`?` letter as the merge
-proceeds, so the dots in Fig 4.1 get absorbed into flanking
-blocks and come out as the block's letter. A real recombination
-— a concrete letter-vs-letter disagreement between adjacent
-records — fails the compatibility test, terminates the merge,
-and becomes a surviving block boundary.
+per-site vector, maintaining a single "accumulator" `IhtVec` —
+the block currently being built — and extending it forward for
+as long as the next record can be merged into it. Two records
+can merge when [`can_merge_families`]({link(map_rs, 466)}) finds
+every slot pair compatible under the `?`-as-wildcard rule;
+[`merge_family_maps`]({link(map_rs, 483)}) then folds the next
+record into the accumulator, overwriting any `?` in the
+accumulator's slot with the incoming non-`?` letter. When the
+next record can't merge — a concrete letter-vs-letter
+disagreement indicates a real recombination — the accumulator
+is pushed to the output and a new one is seeded from that
+record, which becomes a surviving block boundary. So the dots
+in Fig 4.1 get absorbed into flanking blocks and come out as
+the block's letter.
 
 ![Figure 4.2 — After collapse_identical_iht (linkage blocks)](fig4_2.png)
 
