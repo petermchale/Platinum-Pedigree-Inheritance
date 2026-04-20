@@ -1273,14 +1273,22 @@ shorter than `--run` (default 10 markers) and mask them back to
 stretch would look like two back-to-back real boundaries, forcing
 the parsimony rule to emit spurious recombinations.
 
-The driver calls `perform_flips_in_place` three times — on the
-raw per-site vector at
-[`map_builder.rs:1135`]({link(map_rs, 1135)}) (whose output the
-marker file records), after collapse at
-[`map_builder.rs:1193`]({link(map_rs, 1193)}), and again after
-gap-fill at [`map_builder.rs:1203`]({link(map_rs, 1203)}) — so
-each granularity (per-site, per-block, per-gap-filled block) gets
-its own parsimony pass.
+The driver calls `perform_flips_in_place` three times, each with
+a distinct role. The first call (per-site, at
+[`map_builder.rs:1135`]({link(map_rs, 1135)})) runs parsimony on
+the §3 output and produces the labels the marker file records.
+The second (after noise-masking and collapse, at
+[`map_builder.rs:1193`]({link(map_rs, 1193)})) re-runs parsimony
+on the cleaner, coarser per-block view — short noisy runs no
+longer distort the mismatch counts, and block-to-block
+comparisons can resolve cases that were ambiguous at single-site
+resolution. The third (after gap-fill, at
+[`map_builder.rs:1203`]({link(map_rs, 1203)})) re-integrates the
+consensus labels that `fill_missing_values` and
+`fill_missing_values_by_neighbor` write into previously-`?`
+slots; those fills can disagree with the block's current
+orientation, so a final parsimony pass is needed before the iht
+file is written.
 
 After these steps, each kid's paternal and maternal slots are
 fully resolved — shown on separate rows per kid in Figure 4.
