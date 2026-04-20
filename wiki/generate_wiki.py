@@ -1769,10 +1769,13 @@ appears to carry dad's unique allele at site
 {section7["noise_site"]} — a spurious partition outlier inside
 an otherwise-linked block.
 
-**Figure 6.1 — after the first flip pass.** The state below is
-what [`perform_flips_in_place`]({link(map_rs, 702)}) (driver call
-at [`map_builder.rs:1135`]({link(map_rs, 1135)})) produces on the
-§3 output, and what the marker-file write at
+**Figure 6.1 — after the first flip pass.** §3's
+carrier-tagging + swap-by-majority pipeline runs on this
+simulation's per-site records, then
+[`perform_flips_in_place`]({link(map_rs, 702)}) (driver call at
+[`map_builder.rs:1135`]({link(map_rs, 1135)})) aligns the
+resulting labels across sites. The state below is what that
+first flip pass produces — what the marker-file write at
 [`map_builder.rs:1142`]({link(map_rs, 1142)}) records.
 
 ![Figure 6.1 — After perform_flips_in_place #1](fig6_1.png)
