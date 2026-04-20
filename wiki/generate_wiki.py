@@ -1598,18 +1598,31 @@ into this entry (1 until `collapse_identical_iht` runs, ≥1
 afterwards) and a `non_missing_counts` table that
 `fill_missing_values` later consults to pick majority-vote fills.
 Walking this `Vec<IhtVec>` in genomic-coordinate order,
-`perform_flips_in_place` compares each record's `Iht` to the
-previous one and, for each founder, picks the `A`/`B`
-orientation that minimizes [`count_mismatches`]({link(map_rs, 791)})
-— the number of kid slots that differ across the boundary. A non-recombinant
-kid's letter should match across the boundary; a recombinant's
-must change. So minimizing mismatches is a parsimony rule: under
-the chosen orientation, the kids that still change letter across
-the boundary *are* the recombinants, and there are as few of them
-as the data allows. This aligns with the biological prior that
-recombination is rare (far less than one crossover per Mb per
-meiosis) — recombinants end up as the minority kid-subset at each
-boundary, and every non-recombinant kid's letter is preserved,
+`perform_flips_in_place` does not compare each record to its
+immediate VCF neighbor. Instead, for each record it looks
+backward for the most recent preceding record whose
+[`get_flipable_alleles`]({link(iht_rs, 554)}) set is non-empty —
+i.e., the most recent site that carries at least one non-`?`
+letter for a child of a multi-child founder. (A non-informative
+site, or one whose child labels have been masked to `?`, has
+nothing usable to compare against and is skipped.) Then, for
+each founder, it considers applying the same per-founder swap
+§3's swap-by-majority uses — exchange the founder's two letters
+(`A`↔`B` for dad, `C`↔`D` for mom) across every one of that
+founder's children at the current record — and keeps the swap
+only if it lowers [`count_mismatches`]({link(map_rs, 791)}), the
+number of kid slots whose letter differs between the current
+record and that most-recent-flippable predecessor.
+
+A non-recombinant kid's letter should agree between those two
+records; a recombinant's must differ. So minimizing mismatches
+is a parsimony rule: under the chosen per-founder swaps, the
+kids whose letters still change between the two records *are*
+the recombinants, and there are as few of them as the data
+allows. This aligns with the biological prior that recombination
+is rare (far less than one crossover per Mb per meiosis) —
+recombinants end up as the minority kid-subset at each transition,
+and every non-recombinant kid's letter is preserved,
 extending the linkage block through them.
 
 [`collapse_identical_iht`]({link(map_rs, 385)}) (driver call at
