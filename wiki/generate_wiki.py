@@ -1598,12 +1598,12 @@ into this entry (1 until `collapse_identical_iht` runs, ≥1
 afterwards) and a `non_missing_counts` table that
 `fill_missing_values` later consults to pick majority-vote fills.
 Walking this `Vec<IhtVec>` in genomic-coordinate order,
-`perform_flips_in_place` does not compare each record to its
-immediate VCF neighbor. Instead, for each record it looks
-backward for the most recent preceding record whose
-[`get_flipable_alleles`]({link(iht_rs, 554)}) set is non-empty —
-i.e., the most recent site that carries at least one non-`?`
-letter for a child of a multi-child founder. (A non-informative
+`perform_flips_in_place` compares each record with a predecessor
+that is not necessarily the record's immediate VCF neighbor:
+for each record it looks backward for the most recent preceding
+record whose [`get_flipable_alleles`]({link(iht_rs, 554)}) set
+is non-empty — i.e., the most recent site that carries at least
+one non-`?` letter for a child of a multi-child founder. (A non-informative
 site, or one whose child labels have been masked to `?`, has
 nothing usable to compare against and is skipped.) Then, for
 each founder, it considers applying the same per-founder swap
