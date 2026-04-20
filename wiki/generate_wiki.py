@@ -1218,50 +1218,76 @@ one `A`/`B` orientation per block so that consecutive blocks
 agree on every kid that did *not* recombine, isolating Kid3's
 crossover at the site 3–4 block boundary.
 
-## 4. Block collapse, noise filtering, and flip reconciliation
+## 4. Expanding linkage blocks by minimizing recombinants, and removing noise
 
 ![Figure 4 — Collapsed blocks with recombination](fig4.png)
 
-The per-site labels in Figure 3 are correct as *partitions* of the
-children but, as flagged in §3, the letter convention can flip from
-site to site. Several Rust routines reconcile and clean the trace up
-before it is written to disk:
+§3 delivers per-site partition labels whose convention is
+consistent only *within* a linkage block — §3.3 flagged that the
+`A`/`B` (or `C`/`D`) convention can flip across the boundary
+between two adjacent blocks. §4 stitches these per-site labels
+into the largest linkage blocks compatible with the data, so that
+the only block boundaries that survive in the output correspond
+to *real* recombinations.
 
-1. [`collapse_identical_iht`]({link(map_rs, 385)}) (driver call at
-   [`map_builder.rs:1191`]({link(map_rs, 1191)})) merges adjacent
-   sites with compatible letter assignments into blocks, while
-   [`fill_missing_values`]({link(map_rs, 617)}) (driver call at
-   [`map_builder.rs:1200`]({link(map_rs, 1200)})) and
-   [`fill_missing_values_by_neighbor`]({link(map_rs, 540)}) (driver
-   call at [`map_builder.rs:1201`]({link(map_rs, 1201)})) fill the
-   `.` gaps visible in Figure 3.3 from flanking blocks.
-2. [`count_matching_neighbors`]({link(map_rs, 935)}) (driver call at
-   [`map_builder.rs:1172`]({link(map_rs, 1172)})) and
-   [`mask_child_alleles`]({link(map_rs, 970)}) (driver call at
-   [`map_builder.rs:1187`]({link(map_rs, 1187)})) identify isolated
-   runs shorter than `--run` (default 10 markers) and mask them back
-   to `?` as likely sequencing noise, so that collapse does not
-   invent spurious recombinations.
-3. [`perform_flips_in_place`]({link(map_rs, 702)}) enforces a
-   consistent founder-letter orientation across blocks, since the
-   two letters in a founder's pair are interchangeable within any
-   single block. This is the routine that finally pins each block's
-   `A`/`B` (or `C`/`D`) convention so that consecutive blocks agree
-   on every kid that did *not* recombine. The driver calls it three
-   times — before and after block collapse, and again after gap
-   fill — at
-   [`map_builder.rs:1135`]({link(map_rs, 1135)}),
-   [`map_builder.rs:1193`]({link(map_rs, 1193)}), and
-   [`map_builder.rs:1203`]({link(map_rs, 1203)}).
+The load-bearing routine is
+[`perform_flips_in_place`]({link(map_rs, 702)}). Walking the
+vector in order, it compares each entry to its previous neighbor
+and, for each founder, picks the `A`/`B` orientation that
+minimizes [`count_mismatches`]({link(map_rs, 791)}) — the number
+of kid slots that differ across the boundary. A non-recombinant
+kid's letter should match across the boundary; a recombinant's
+must change. So minimizing mismatches is a parsimony rule: under
+the chosen orientation, the kids that still change letter across
+the boundary *are* the recombinants, and there are as few of them
+as the data allows. This aligns with the biological prior that
+recombination is rare (far less than one crossover per Mb per
+meiosis) — recombinants end up as the minority kid-subset at each
+boundary, and every non-recombinant kid's letter is preserved,
+extending the linkage block through them.
 
-After these steps, each kid's paternal and maternal slots are fully
-resolved — shown on separate rows per kid in Figure 4. Within each
-block all three kids' labels agree on a single partition; across
-adjacent blocks, only the kid(s) that genuinely recombined change
-letter. Kid3's highlighted `A`→`B` transition on the paternal row is
-emitted to `{{prefix}}.recombinants.txt` by
-[`summarize_child_changes`]({link(map_rs, 673)}) (driver call at
-[`map_builder.rs:1228`]({link(map_rs, 1228)})).
+[`collapse_identical_iht`]({link(map_rs, 385)}) (driver call at
+[`map_builder.rs:1191`]({link(map_rs, 1191)})) then merges
+adjacent sites whose labels are now identical into a single
+block. After the flip pass has chosen a parsimonious convention,
+every remaining boundary between blocks corresponds to a genuine
+kid-letter change — a real recombination — and everything in
+between is one contiguous linkage block.
+[`fill_missing_values`]({link(map_rs, 617)}) (driver call at
+[`map_builder.rs:1200`]({link(map_rs, 1200)})) and
+[`fill_missing_values_by_neighbor`]({link(map_rs, 540)}) (driver
+call at [`map_builder.rs:1201`]({link(map_rs, 1201)})) further
+extend each block across the `.` gaps (non-informative sites)
+from flanking blocks, so block extent is reported in physical
+coordinates.
+
+Noise filtering protects the parsimony argument.
+[`count_matching_neighbors`]({link(map_rs, 935)}) (driver call at
+[`map_builder.rs:1172`]({link(map_rs, 1172)})) and
+[`mask_child_alleles`]({link(map_rs, 970)}) (driver call at
+[`map_builder.rs:1187`]({link(map_rs, 1187)})) find isolated runs
+shorter than `--run` (default 10 markers) and mask them back to
+`?` before collapse. Without this guard, a short mis-called
+stretch would look like two back-to-back real boundaries, forcing
+the parsimony rule to emit spurious recombinations.
+
+The driver calls `perform_flips_in_place` three times — on the
+raw per-site vector at
+[`map_builder.rs:1135`]({link(map_rs, 1135)}) (whose output the
+marker file records), after collapse at
+[`map_builder.rs:1193`]({link(map_rs, 1193)}), and again after
+gap-fill at [`map_builder.rs:1203`]({link(map_rs, 1203)}) — so
+each granularity (per-site, per-block, per-gap-filled block) gets
+its own parsimony pass.
+
+After these steps, each kid's paternal and maternal slots are
+fully resolved — shown on separate rows per kid in Figure 4.
+Within each block all three kids' labels agree on a single
+partition; across adjacent blocks, only the kid(s) that genuinely
+recombined change letter. Kid3's highlighted `A`→`B` transition
+on the paternal row is emitted to `{{prefix}}.recombinants.txt`
+by [`summarize_child_changes`]({link(map_rs, 673)}) (driver call
+at [`map_builder.rs:1228`]({link(map_rs, 1228)})).
 
 ## 5. Truth versus deduced
 
