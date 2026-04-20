@@ -1590,10 +1590,13 @@ describes the second and third calls). Its input is
 the per-site sequence of `IhtVec` records built by the VCF loop:
 each [`IhtVec`]({link(iht_rs, 139)}) pairs a `BedRecord`
 (chromosome + start/end coordinates of the site) with an
-[`Iht`]({link(iht_rs, 133)}) — the founder-letter map
-`(hap_a, hap_b)` per sample — plus a `count` of how many sites
-have been merged into it (1 before collapse, ≥1 after) and a
-table of per-sample non-`?` letter counts used for book-keeping.
+[`Iht`]({link(iht_rs, 133)}) — two `sample_id → (hap_a, hap_b)`
+maps, one for founders and one for children, storing each
+sample's pair of letter slots at that site — along with a `count`
+field that records how many per-site records have been merged
+into this entry (1 until `collapse_identical_iht` runs, ≥1
+afterwards) and a `non_missing_counts` table that
+`fill_missing_values` later consults to pick majority-vote fills.
 Walking this `Vec<IhtVec>` in genomic-coordinate order,
 `perform_flips_in_place` compares each record's `Iht` to the
 previous one and, for each founder, picks the `A`/`B`
