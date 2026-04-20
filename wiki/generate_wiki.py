@@ -649,9 +649,9 @@ def component_1_nuclear_family(out_dir: Path) -> None:
     # rows, highlighting Kid3's A -> B transition.
     # ------------------------------------------------------------------
     body_d = [
-        "Figure 4 — Collapsed blocks with recombination",
+        "Figure 4 — Linkage blocks after minimum-recombinants reconciliation",
         "",
-        "Deduced labels after perform_flips_in_place + collapse + gap-fill:",
+        "Labels after perform_flips_in_place (parsimony) + collapse + gap-fill:",
         "",
     ]
     for k in kids:
@@ -665,8 +665,10 @@ def component_1_nuclear_family(out_dir: Path) -> None:
         body_d.append(mat_row)
     body_d += [
         "",
-        "Kid3's paternal row switches A -> B between sites 3 and 4;",
-        "this transition is written to {prefix}.recombinants.txt.",
+        "Kid3's paternal A -> B between sites 3 and 4 is the lone",
+        "boundary letter change; Kid1 and Kid2 keep their letters,",
+        "extending the linkage block across them. This transition is",
+        "written to {prefix}.recombinants.txt.",
     ]
     _render_panel_image(body_d, nf_dir / "fig4.png")
 
@@ -1220,7 +1222,7 @@ crossover at the site 3–4 block boundary.
 
 ## 4. Expanding linkage blocks by minimizing recombinants, and removing noise
 
-![Figure 4 — Collapsed blocks with recombination](fig4.png)
+![Figure 4 — Linkage blocks after minimum-recombinants reconciliation](fig4.png)
 
 §3 delivers per-site partition labels whose convention is
 consistent only *within* a linkage block — §3.3 flagged that the
