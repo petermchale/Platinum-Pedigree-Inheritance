@@ -1584,7 +1584,9 @@ the only block boundaries that survive in the output correspond
 to *real* recombinations.
 
 The load-bearing routine is
-[`perform_flips_in_place`]({link(map_rs, 702)}). Its input is
+[`perform_flips_in_place`]({link(map_rs, 702)}) (first driver
+call at [`map_builder.rs:1135`]({link(map_rs, 1135)}); §7
+describes the second and third calls). Its input is
 the per-site sequence of `IhtVec` records built by the VCF loop:
 each [`IhtVec`]({link(iht_rs, 139)}) pairs a `BedRecord`
 (chromosome + start/end coordinates of the site) with an
