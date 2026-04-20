@@ -1737,8 +1737,16 @@ over the maternal rows using mom's `C`/`D`:
   letters so that pairwise-`=` kids get the same letter and
   pairwise-`X` kids get different letters.
 - A site at which any pair-relation flips (`=`→`X` or `X`→`=`)
-  is a block boundary, and the kid whose pair-relations flipped
-  is the recombinant there.
+  is a block boundary. To identify which kid recombined there,
+  use the fact that when kid `k` switches homologs at the
+  boundary, every pair-relation involving `k` flips (its
+  agreement with every other kid now holds in the opposite
+  sense) and every pair-relation that doesn't involve `k` is
+  unchanged (those kids both kept their homologs). So the
+  recombinant is the kid common to *every* flipped pair and
+  absent from *every* unchanged pair. With three kids, the
+  signature is two flipped pairs sharing a common kid plus one
+  unchanged pair between the other two.
 - Across a block boundary the parent's two letters can be
   swapped freely without changing any partition. Pick the
   orientation that keeps the most kids on the same letter across
