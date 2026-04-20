@@ -1786,17 +1786,49 @@ unmasked, it would look like two adjacent recombinations in
 {section7["noise_kid"]} — one into the outlier, one out — and
 `{{prefix}}.recombinants.txt` would report both.
 
-**Figure 6.2 — after noise masking.**
-[`count_matching_neighbors`]({link(map_rs, 935)}) (driver call at
-[`map_builder.rs:1172`]({link(map_rs, 1172)})) walks each kid's
-per-slot sequence of non-`?` labels and flags every position
-whose contiguous run of identical labels has fewer than `--run`
-neighbors on both sides. (Default is `--run`=10; this demo uses
-`--run`={section7["min_run"]} so a length-1 outlier inside a
-four-site run is visibly isolated.)
-[`mask_child_alleles`]({link(map_rs, 970)}) (driver call at
-[`map_builder.rs:1187`]({link(map_rs, 1187)})) writes `?` at
-every flagged position.
+**Figure 6.2 — after noise masking.** The mask runs per kid,
+per slot, in three steps:
+
+1. [`collect_alleles_with_positions`]({link(map_rs, 916)})
+   builds the per-(kid, slot) sequence of `(position, letter)`
+   pairs by walking `pre_vector` and dropping every entry whose
+   slot letter is `?`. One pair per informative site for that
+   slot.
+2. [`count_matching_neighbors`]({link(map_rs, 935)}) (driver
+   call at [`map_builder.rs:1172`]({link(map_rs, 1172)}))
+   receives that sequence and computes, for each focal
+   position:
+   - `count_before`: how far the contiguous run of the focal
+     site's letter extends backward, *including the focal site
+     itself*. Start at 1 and add 1 for each immediately-
+     preceding site whose label matches; stop at the first
+     site whose label differs.
+   - `count_after`: the same, counting forward.
+   The function returns only those focal sites where *both*
+   `count_before` and `count_after` are strictly less than
+   `--run` — i.e., sites whose letter forms only a short run on
+   both sides.
+3. [`mask_child_alleles`]({link(map_rs, 970)}) (driver call at
+   [`map_builder.rs:1187`]({link(map_rs, 1187)})) takes the
+   returned positions and overwrites the corresponding slot
+   in every `IhtVec` with `?`.
+
+(Default `--run` is 10; this demo uses
+`--run`={section7["min_run"]}, which flags any site whose run
+is length 1 in both directions — an isolated letter whose
+immediate neighbors on both sides differ. Worked trace of
+{section7["noise_kid"]}'s paternal sequence `A A B A A`:
+
+| site | letter | count_before | count_after | flagged? |
+|------|--------|--------------|-------------|----------|
+| 0    | A      | 1            | 2           | no       |
+| 1    | A      | 2            | 1           | no       |
+| 2    | B      | 1            | 1           | **yes**  |
+| 3    | A      | 1            | 2           | no       |
+| 4    | A      | 2            | 1           | no       |
+
+Only the `B` at site {section7["noise_site"]} has both counts
+below 2, so it alone is masked to `?`.)
 
 ![Figure 6.2 — After mask_child_alleles](fig6_2.png)
 
