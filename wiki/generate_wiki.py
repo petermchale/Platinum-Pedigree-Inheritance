@@ -2119,10 +2119,10 @@ def component_2_three_generations(out_dir: Path) -> None:
     body_2 = [
         "Figure 2 — Unphased VCF rows for the G2->G3 pass",
         "",
-        "Kid3  :   " + " ".join(_fmt_gt(g) for g in kid3_unphased),
-        "Spouse:   " + " ".join(_fmt_gt(g) for g in spouse_unphased),
-        "GK1   :   " + " ".join(_fmt_gt(g) for g in gk_unphased["GK1"]),
-        "GK2   :   " + " ".join(_fmt_gt(g) for g in gk_unphased["GK2"]),
+        "Spouse (dad):   " + " ".join(_fmt_gt(g) for g in spouse_unphased),
+        "Kid3 (mom)  :   " + " ".join(_fmt_gt(g) for g in kid3_unphased),
+        "GK1         :   " + " ".join(_fmt_gt(g) for g in gk_unphased["GK1"]),
+        "GK2         :   " + " ".join(_fmt_gt(g) for g in gk_unphased["GK2"]),
         "",
         "(0/0 rendered as '00', 0/1 as '01', 1/1 as '11')",
     ]
