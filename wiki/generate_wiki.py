@@ -2142,28 +2142,6 @@ def component_2_three_generations(out_dir: Path) -> None:
     _render_panel_image(body_4, tg_dir / "fig2.png")
 
     # ------------------------------------------------------------------
-    # Figure 5 — truth vs deduced, paternal and maternal on separate rows.
-    # ------------------------------------------------------------------
-    body_5 = [
-        "Figure 5 — Truth vs deduced founder labels",
-        "",
-        "Truth (T) vs deduced (D) founder-letter labels:",
-        "",
-    ]
-    for g in grandkids:
-        pat_truth = [truth_labels[g][i][0] for i in range(num_sites)]
-        mat_truth = [truth_labels[g][i][1] for i in range(num_sites)]
-        pat_dedu = [paternal_blocks[g][i] for i in range(num_sites)]
-        mat_dedu = [maternal_blocks[g][i] for i in range(num_sites)]
-        body_5.append(f"  {g} p  T:  " + " ".join(pat_truth))
-        body_5.append(f"  {g} p  D:  " + " ".join(pat_dedu))
-        body_5.append(f"  {g} m  T:  " + " ".join(mat_truth))
-        body_5.append(f"  {g} m  D:  " + " ".join(mat_dedu))
-        body_5.append("")
-    body_5.append(f"Total label mismatches: {mismatches} / {total_slots}")
-    _render_panel_image(body_5, tg_dir / "fig5.png")
-
-    # ------------------------------------------------------------------
     # Panels F.1, F.2, F.3 — pairwise-comparison view of the G2->G3 pass
     # (§6). Mirrors the nuclear-family §6 treatment but adds a chaining
     # step (Fig 6.3) that propagates Kid3's per-site G1 letters into the
@@ -2705,21 +2683,6 @@ the counts come out:
 |---|---|---|
 | Ancestral `A→B` | 1 (in G1-Dad) | 2 (GK1 m, GK2 m) |
 | De novo `B→C`   | 1 (in Kid3's G2→G3 meiosis) | 1 (GK1 m) |
-
-### Sanity check against truth
-
-![Figure 5 — Truth vs deduced founder labels](fig5.png)
-
-For both grandchildren the deduced paternal and maternal label
-streams match the ground truth at every site
-({mismatches} mismatches out of {total_slots} label slots),
-including both the ancestral and de novo transitions. The block map
-stored for G3 uses the letters `{{A, B, C, E, F}}` — all three of
-Kid3's per-site letters reach G3, because GK1's gamete from Kid3
-crossed over between homologs. As in the nuclear-family case the
-block map contains only founder letters; the 0/1 allele sequence of
-each haplotype is reconstructed downstream by `gtg-concordance`
-(see the [concordance walkthrough](../concordance/concordance.md)).
 
 ## 5. The pairwise-comparison view, extended to three generations
 
