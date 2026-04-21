@@ -2692,7 +2692,7 @@ def component_3_concordance(out_dir: Path) -> None:
         "",
         "Inputs consumed at this site:",
         "",
-        "  (A) Observed unphased genotypes (read from VCF):",
+        "  (A) Observed unphased alleles (read from VCF):",
         f"      Dad  = {_fmt_gt(obs1['Dad'])}   Mom  = {_fmt_gt(obs1['Mom'])}",
         f"      Kid1 = {_fmt_gt(obs1['Kid1'])}   "
         f"Kid2 = {_fmt_gt(obs1['Kid2'])}   "
