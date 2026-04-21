@@ -2663,9 +2663,21 @@ classical inheritance vector of Lander & Green.)
 
 ![Figure 3 — Recursive informative-site deduction (G2 -> G3)](fig3.png)
 
-Figure 3 zooms in on the Step-2 output (see
+Figure 3 shows the letters written on the two grandchildren's
+slots at the **informative sites only** (non-informative sites are
+rendered as `.`). This is the state of the `Iht` grid for triple 2
+after [`track_alleles_through_pedigree`]({link(map_rs, 295)}) has
+tagged the carrier homolog at each informative site (Step 2 of
 [nuclear_family §3](../nuclear_family/nuclear_family.md#3-informative-site-detection-founder-letter-tagging-and-haplotype-inference-within-a-linkage-block))
-for triple 2 only. The two indicator rows mark:
+*and* [`backfill_sibs`]({link(map_rs, 804)}) has written the
+parent's other letter onto the non-carrier grandchild (Step 3a).
+That is why, at every Spouse-informative site, both `E` and `F`
+appear — one tagged directly as the carrier of Spouse's unique
+allele, the other filled in by `backfill_sibs`; the same is true
+of the Kid3-informative sites on the maternal row. (With only two
+grandchildren the Step-3b swap-by-majority is a tie and fires no
+swap, so Step 3a's letters are also the final ones.) The two
+indicator rows mark:
 
 - **Spouse-informative** (Spouse het × Kid3 hom) at sites
   `{spouse_info_sites}`. The unique paternal allele tags whichever
