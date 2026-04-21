@@ -2111,11 +2111,11 @@ def component_2_three_generations(out_dir: Path) -> None:
     _render_panel_image(body_1, tg_dir / "fig1.png")
 
     # ------------------------------------------------------------------
-    # Figure 4 — collapsed blocks showing the ancestral crossover shared
+    # Figure 2 — collapsed blocks showing the ancestral crossover shared
     # between GK1 and GK2, plus the per-meiosis crossover unique to GK1.
     # ------------------------------------------------------------------
     body_4 = [
-        "Figure 4 — Ancestral vs de novo crossovers after block collapse",
+        "Figure 2 — Ancestral vs de novo crossovers after block collapse",
         "",
         "Deduced labels after block collapse and gap-fill:",
         "",
@@ -2138,12 +2138,8 @@ def component_2_three_generations(out_dir: Path) -> None:
         "Only GK1's maternal row switches B -> C between sites 5 and 6;",
         "this is a DE NOVO crossover in Kid3's own meiosis — a recombinant",
         "of a recombinant — and it appears in one grandchild only.",
-        "",
-        "Both transitions are emitted verbatim to {prefix}.recombinants.txt;",
-        "collapsing shared ancestral events into a unique meiotic-event count",
-        "is the downstream-reconciliation step methods.md section 4.5 describes.",
     ]
-    _render_panel_image(body_4, tg_dir / "fig4.png")
+    _render_panel_image(body_4, tg_dir / "fig2.png")
 
     # ------------------------------------------------------------------
     # Figure 5 — truth vs deduced, paternal and maternal on separate rows.
@@ -2675,7 +2671,7 @@ criterion, not a posterior; no genetic map is consulted.
 
 ## 4. Ancestral vs de novo crossovers
 
-![Figure 4 — Ancestral vs de novo crossovers after block collapse](fig4.png)
+![Figure 2 — Ancestral vs de novo crossovers after block collapse](fig2.png)
 
 Two maternal-row transitions appear, and the contrast between them
 is the point of this page:
@@ -3824,7 +3820,7 @@ individual propagates to all of that individual's G3 descendants and
 appears at the same coordinate in each of their rows. The
 [three-generation walkthrough](three_generations/three_generations.md)
 shows this explicitly: its
-[Figure 4](three_generations/three_generations.md#4-ancestral-vs-per-meiosis-crossovers)
+[Figure 2](three_generations/three_generations.md#4-ancestral-vs-de-novo-crossovers)
 contrasts two transitions in the same trace — an ancestral A→B at
 sites 3/4 that appears on *both* grandchildren's rows (one meiotic
 event, two `recombinants.txt` entries) and a per-meiosis B→C at sites
