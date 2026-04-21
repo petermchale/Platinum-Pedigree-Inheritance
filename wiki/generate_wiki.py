@@ -2631,7 +2631,7 @@ def component_3_concordance(out_dir: Path) -> None:
     # gtg-concordance reads in as its input).
     # ------------------------------------------------------------------
     body_1 = [
-        "Figure 1 — Block letter map (input to gtg-concordance)",
+        "Figure 1 — Phasing variants in an inheritance block",
         "",
         "Letter labels in the left half of the chromosome,",
         "as written by gtg-ped-map into {prefix}.iht.txt:",
@@ -2927,19 +2927,44 @@ python wiki/generate_wiki.py --page concordance
 which regenerates both the figure PNGs referenced here and this
 markdown file itself.
 
-## 1. Block letter map — an input to `gtg-concordance`
+## 1. Ingesting inheritance blocks and their variants
 
-![Figure 1 — Block letter map (an input to gtg-concordance)](fig1.png)
+![Figure 1 — Phasing variants in an inheritance block](fig1.png)
 
 The driver reads the `{{prefix}}.iht.txt` file produced by
 `gtg-ped-map` using
 [`parse_ihtv2_file`]({link(iht_rs, 606)}) (driver call at
-[`gtg_concordance.rs:405`]({link(conc_rs, 405)})). Each entry carries
-one block's letter labels for every individual in the pedigree. Inside
-this block the letters are constant; for the left half of the
-nuclear-family chromosome they are the ones shown in Figure 1. Every
-VCF record whose position falls inside the block is then handed to
-the per-site phasing loop at
+[`gtg_concordance.rs:405`]({link(conc_rs, 405)})). The parser walks
+the file line by line: the first three whitespace-separated fields of
+each row are the `chrom`, `start`, and `end` of the block's BED
+interval, the trailing columns carry the per-block marker count, and
+the middle columns — one per individual, in the header order — hold
+the two letter labels separated by `|` or `/`. Using `founder_count`
+(taken from the pedigree) as the split point, the first chunk of
+individuals is stored in the block's `founders` map and the rest in
+its `children` map, so every block ends up as an `IhtVec {{ bed,
+iht: Iht {{ founders, children }}, count }}` entry. Inside this block
+the letters are constant; for the left half of the nuclear-family
+chromosome they are the ones shown in Figure 1.
+
+The driver then iterates over the returned `Vec<IhtVec>` one block at
+a time. For each block it converts the BED coordinates to the
+`(chrom_id, start, end)` triple expected by `rust-htslib` and calls
+`reader.fetch(...)` at
+[`gtg_concordance.rs:427`]({link(conc_rs, 427)}) to position the VCF
+reader on the first record that falls inside the block — silently
+skipping the block if the fetch fails (e.g. the contig is absent from
+the VCF index). Every record returned by the resulting
+`reader.records()` iterator is fed through
+[`parse_vcf_record`]({link(conc_rs, 116)}) at
+[`gtg_concordance.rs:440`]({link(conc_rs, 440)}), which pulls each
+sample's depth and (unphased, index-sorted) allele vector into a
+`HashMap<String, (depth, Vec<GenotypeAllele>)>`. Low-quality records
+(`record.qual() < args.qual`) and records with missing alleles are
+short-circuited straight to `{{prefix}}.fail.vcf` at
+[`gtg_concordance.rs:444`]({link(conc_rs, 444)}) and
+[`gtg_concordance.rs:450`]({link(conc_rs, 450)}); everything else is
+handed to the per-site phasing loop at
 [`gtg_concordance.rs:437`]({link(conc_rs, 437)}) — including variants
 that `gtg-ped-map` could not use because neither parent has a unique
 allele.
