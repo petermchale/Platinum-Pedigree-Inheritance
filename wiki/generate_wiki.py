@@ -2515,18 +2515,21 @@ become visible once a third generation is in the pedigree:
    pipeline is **not** part of this walk. Sibship backfilling
    ([`backfill_sibs`]({link(map_rs, 804)})) runs once per VCF
    record at the whole-family level, right after the walk, consuming
-   its output. Block collapse
-   ([`collapse_identical_iht`]({link(map_rs, 385)})), gap-fill
-   ([`fill_missing_values`]({link(map_rs, 617)}) and
-   [`fill_missing_values_by_neighbor`]({link(map_rs, 540)})) and the
-   flip pass ([`perform_flips_in_place`]({link(map_rs, 702)})) are
-   run later still, as *global passes over the pooled grid of every
-   record × every individual*. None of them iterate triples or depths
-   at all. So "single ancestor-first walk" describes the
-   letter-assignment step specifically — not the full nuclear-family
-   pipeline — and the rest of the post-processing simply sees a
-   wider grid (more individuals, one more generation) in the G3 case
-   than it did in the nuclear-family case.
+   its output. The flip pass
+   ([`perform_flips_in_place`]({link(map_rs, 702)})), block collapse
+   ([`collapse_identical_iht`]({link(map_rs, 385)})) and gap-fill
+   ([`fill_missing_values`]({link(map_rs, 617)}) then
+   [`fill_missing_values_by_neighbor`]({link(map_rs, 540)})) are
+   run later still — in that execution order, with
+   `perform_flips_in_place` invoked three times in total, once
+   before collapse and again after each gap-fill step — as
+   *global passes over the pooled grid of every record × every
+   individual*. None of them iterate triples or depths at all. So
+   "single ancestor-first walk" describes the letter-assignment step
+   specifically — not the full nuclear-family pipeline — and the
+   rest of the post-processing simply sees a wider grid (more
+   individuals, one more generation) in the G3 case than it did in
+   the nuclear-family case.
 2. Two qualitatively different kinds of crossover can appear in a
    grandchild's letter trace: an **ancestral** crossover, inherited
    unchanged from one of Kid3's homologs and therefore shared across
@@ -2676,16 +2679,19 @@ every one of those routines unchanged.
 
 ## 4. Ancestral vs de novo crossovers
 
-As emphasised in the intro, the block-collapse, gap-fill and flip
-routines — [`collapse_identical_iht`]({link(map_rs, 385)}) (driver
-call at [`map_builder.rs:1191`]({link(map_rs, 1191)})),
+As emphasised in the intro, the flip, block-collapse and gap-fill
+routines — in driver-call order,
+[`perform_flips_in_place`]({link(map_rs, 702)}) (at
+[`map_builder.rs:1135`]({link(map_rs, 1135)})),
+[`collapse_identical_iht`]({link(map_rs, 385)}) (at
+[`map_builder.rs:1191`]({link(map_rs, 1191)})),
+`perform_flips_in_place` again (at
+[`map_builder.rs:1193`]({link(map_rs, 1193)})),
 [`fill_missing_values`]({link(map_rs, 617)}) (at
 [`map_builder.rs:1200`]({link(map_rs, 1200)})),
 [`fill_missing_values_by_neighbor`]({link(map_rs, 540)}) (at
 [`map_builder.rs:1201`]({link(map_rs, 1201)})), and
-[`perform_flips_in_place`]({link(map_rs, 702)}) (driver calls at
-[`map_builder.rs:1135`]({link(map_rs, 1135)}),
-[`map_builder.rs:1193`]({link(map_rs, 1193)}) and
+`perform_flips_in_place` once more (at
 [`map_builder.rs:1203`]({link(map_rs, 1203)})) — are **not** part
 of the ancestor-first walk. They run as global passes across the
 whole record-by-individual grid, see GK1 and GK2 as two additional
