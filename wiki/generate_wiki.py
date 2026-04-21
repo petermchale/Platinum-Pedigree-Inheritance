@@ -2749,8 +2749,11 @@ def component_3_concordance(out_dir: Path) -> None:
         )
         rows_2.append(((a_A, a_B, a_C, a_D), assignment, phased, expected_unphased, nmis))
     rows_2.sort(key=lambda r: r[0])
+    winning_assignment = ""
     for _, assignment, phased, expected_unphased, nmis in rows_2:
         star = "   <- winner" if nmis == 0 else ""
+        if nmis == 0:
+            winning_assignment = assignment
         body_2.append(
             _cols(
                 [assignment, phased, expected_unphased, observed_unphased, str(nmis)],
@@ -2758,6 +2761,15 @@ def component_3_concordance(out_dir: Path) -> None:
                 star,
             )
         )
+    best_exp = s1["best"][2]
+    body_2 += [
+        "",
+        f"Deduced phased genotypes at site {s1['label']} "
+        f"(from the winning mapping {winning_assignment}):",
+        f"   Kid1 = {_fmt_phased(best_exp['Kid1'])}   "
+        f"Kid2 = {_fmt_phased(best_exp['Kid2'])}   "
+        f"Kid3 = {_fmt_phased(best_exp['Kid3'])}",
+    ]
     _render_panel_image(body_2, c_dir / "fig2.png")
 
     # ------------------------------------------------------------------
