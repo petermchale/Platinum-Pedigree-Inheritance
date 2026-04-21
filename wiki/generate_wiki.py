@@ -2897,7 +2897,7 @@ def _emit_component3_markdown(
     n2_min_mis = min(r[3] for r in n2["orient_results"])
 
     content = f"""\
-# Closing the loop with `gtg-concordance`
+# Phasing alleles consistently with the haplotype map
 
 This page is part of the [wiki](../index.md) and picks up where the
 [nuclear-family walkthrough](../nuclear_family/nuclear_family.md) left
@@ -3602,7 +3602,7 @@ python wiki/generate_wiki.py
    (Spouse) and adding a G3 sibship. Shows how the same single loop
    handles G2→G3 via ancestor-first depth ordering, without ever
    constructing a joint inheritance vector over all founders.
-3. [Closing the loop with gtg-concordance](concordance/concordance.md)
+3. [Phasing alleles consistently with the haplotype map](concordance/concordance.md)
    — closes the pipeline by mapping founder letters back to VCF
    alleles at the sites `gtg-ped-map` could not touch. Introduces the
    `2^F` founder-phase orientation search and the "impossible

@@ -33,7 +33,7 @@ python wiki/generate_wiki.py
    (Spouse) and adding a G3 sibship. Shows how the same single loop
    handles G2→G3 via ancestor-first depth ordering, without ever
    constructing a joint inheritance vector over all founders.
-3. [Closing the loop with gtg-concordance](concordance/concordance.md)
+3. [Phasing alleles consistently with the haplotype map](concordance/concordance.md)
    — closes the pipeline by mapping founder letters back to VCF
    alleles at the sites `gtg-ped-map` could not touch. Introduces the
    `2^F` founder-phase orientation search and the "impossible
