@@ -2655,9 +2655,22 @@ for the second triple.
 Two consequences worth stating explicitly:
 
 - **No joint inheritance vector over `{{A, B, C, D, E, F}}` is ever
-  constructed.** Each individual — founder or not — ends each VCF
-  record with exactly two letters, one per homolog. Adding a
-  generation does not widen the per-site representation.
+  constructed.** In the classical linkage-analysis sense (Lander &
+  Green, *PNAS* 84:2363–2367, [1987](https://doi.org/10.1073/pnas.84.8.2363)),
+  a per-site *inheritance vector* for a pedigree with `n`
+  non-founders is a length-`2n` label vector that names, for each
+  non-founder's two homologs, which of the `2F` founder homologs
+  each one descends from — the central representation manipulated
+  by the Lander-Green Hidden Markov Model and by tools like
+  [Merlin](https://doi.org/10.1038/ng786) (Abecasis et al.,
+  *Nat. Genet.* 30:97–101, 2002). For this pedigree that would be
+  a joint vector of length 10 over the founder-homolog alphabet
+  `{{A, B, C, D, E, F}}` (two slots each for Kid1, Kid2, Kid3, GK1,
+  GK2). `gtg-ped-map` never assembles that object. Instead, each
+  individual — founder or not — ends each VCF record with just its
+  own two letters, one per homolog; the per-site representation
+  stays per-individual, not per-pedigree, and adding a generation
+  does not widen it.
 - **Non-founder parents are first-class.** Their letters just happen
   to vary across sites, whereas founder letters are constant. Kid3
   plays the parent role in triple 2 without any special casing
