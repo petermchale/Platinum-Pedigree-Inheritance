@@ -2725,13 +2725,18 @@ def component_3_concordance(out_dir: Path) -> None:
         f"K2={_fmt_gt(obs1['Kid2'])} "
         f"K3={_fmt_gt(obs1['Kid3'])}"
     )
+    rows_2 = []
     for dl, ml, exp, nmis in s1["orient_results"]:
         dad_pair = _sorted_unphased(obs1["Dad"])
         mom_pair = _sorted_unphased(obs1["Mom"])
-        assignment = (
-            f"{dl[0]}={dad_pair[0]},{dl[1]}={dad_pair[1]};"
-            f"{ml[0]}={mom_pair[0]},{ml[1]}={mom_pair[1]}"
-        )
+        letter_to_allele = {
+            dl[0]: dad_pair[0],
+            dl[1]: dad_pair[1],
+            ml[0]: mom_pair[0],
+            ml[1]: mom_pair[1],
+        }
+        a_A, a_B, a_C, a_D = (letter_to_allele[L] for L in "ABCD")
+        assignment = f"A={a_A},B={a_B};C={a_C},D={a_D}"
         phased = (
             f"K1={_fmt_phased(exp['Kid1'])} "
             f"K2={_fmt_phased(exp['Kid2'])} "
@@ -2742,6 +2747,9 @@ def component_3_concordance(out_dir: Path) -> None:
             f"K2={_fmt_gt(exp['Kid2'])} "
             f"K3={_fmt_gt(exp['Kid3'])}"
         )
+        rows_2.append(((a_A, a_B, a_C, a_D), assignment, phased, expected_unphased, nmis))
+    rows_2.sort(key=lambda r: r[0])
+    for _, assignment, phased, expected_unphased, nmis in rows_2:
         star = "   <- winner" if nmis == 0 else ""
         body_2.append(
             _cols(
@@ -3003,7 +3011,13 @@ chooses which of dad's two sorted VCF alleles is tagged `A` vs `B`
 and which of mom's two is tagged `C` vs `D` — recall that the
 founders' letters are *unphased* (A/B, C/D), whereas each kid's
 letter pair is *phased* (paternal letter | maternal letter) by
-construction of the block. Under a given mapping,
+construction of the block. Only 4 of the `2^4 = 16` conceivable
+letter-allele tuples are actually reachable: each founder's VCF
+genotype at this site is `0/1`, containing exactly one `0` and one
+`1`, and those two values are what the founder's two letters split
+between them — so `A` and `B` can't both be `0` (nor both `1`), and
+likewise for `C` and `D`. The surviving `2^F = 4` mappings are the
+2 orderings per founder. Under a given mapping,
 [`Iht::assign_genotypes`]({link(iht_rs, 442)}) (driver call at
 [`gtg_concordance.rs:487`]({link(conc_rs, 487)}) on the failing branch
 and [`gtg_concordance.rs:514`]({link(conc_rs, 514)}) on the passing
