@@ -2637,9 +2637,9 @@ def component_3_concordance(out_dir: Path) -> None:
         return "".join(parts).rstrip() + trailing
 
     body_1 = [
-        "Figure 1 — Non-informative sites inside the block",
+        "Figure 1 — Non-informative sites inside a block",
         "",
-        "Two additional sites INSIDE the block where both parents are het:",
+        "Two additional sites INSIDE a block where both parents are het:",
         "",
         _cols(site_cols, site_widths, "   <- observed genotypes"),
     ]
@@ -2972,9 +2972,9 @@ handed to the per-site phasing step —
 that `gtg-ped-map` could not use because neither parent has a unique
 allele.
 
-## 2. Non-informative sites inside the block
+## 2. Non-informative sites inside a block
 
-![Figure 1 — Non-informative sites inside the block](fig1.png)
+![Figure 1 — Non-informative sites inside a block](fig1.png)
 
 The two sites in Figure 1 are both homozygous-absent for informative
 patterns: dad is `0/1` and so is mom. `gtg-ped-map`'s
