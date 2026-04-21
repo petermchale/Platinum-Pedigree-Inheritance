@@ -2673,7 +2673,7 @@ def component_3_concordance(out_dir: Path) -> None:
     _render_panel_image(body_1, c_dir / "fig1.png")
 
     # ------------------------------------------------------------------
-    # Figure 2 — founder-allele-assignment enumeration at clean site N1.
+    # Figure 2 — letter-allele-mapping enumeration at clean site N1.
     # ------------------------------------------------------------------
     s1 = per_site[0]
     obs1 = s1["observed"]
@@ -2682,7 +2682,7 @@ def component_3_concordance(out_dir: Path) -> None:
     assign_widths = [20, 22, 22, 5]
 
     body_2 = [
-        f"Figure 2 — Enumerating founder-allele assignments at site {s1['label']} (clean pass)",
+        f"Figure 2 — Enumerating letter-allele mappings at site {s1['label']} (clean pass)",
         "",
         "Inputs consumed at this site:",
         "",
@@ -2741,7 +2741,7 @@ def component_3_concordance(out_dir: Path) -> None:
     _render_panel_image(body_2, c_dir / "fig2.png")
 
     # ------------------------------------------------------------------
-    # Figure 3 — founder-allele-assignment search at error site N2.
+    # Figure 3 — letter-allele-mapping search at error site N2.
     # ------------------------------------------------------------------
     s2 = per_site[1]
     obs2 = s2["observed"]
@@ -2750,7 +2750,7 @@ def component_3_concordance(out_dir: Path) -> None:
     assign_widths_slim = [20, 22, 5]
 
     body_3 = [
-        f"Figure 3 — No founder-allele assignment fits site {s2['label']} (injected error)",
+        f"Figure 3 — No letter-allele mapping fits site {s2['label']} (injected error)",
         "",
         f"Site {s2['label']} (ERROR):  "
         f"Dad={_fmt_gt(obs2['Dad'])}  "
@@ -2976,22 +2976,22 @@ Site `N2` carries an **injected sequencing error**: Kid1 is reported
 as `1/1` even though the simulation truth is `0/1`. This is the case
 that the "impossible genotype" rule in Figure 3 is designed to catch.
 
-## 3. Enumerating founder-allele assignments at a clean site
+## 3. Enumerating letter-allele mappings at a clean site
 
-![Figure 2 — Enumerating founder-allele assignments at site N1 (clean pass)](fig2.png)
+![Figure 2 — Enumerating letter-allele mappings at site N1 (clean pass)](fig2.png)
 
 At every record inside a block,
 [`find_best_phase_orientation`]({link(conc_rs, 252)}) (driver call at
 [`gtg_concordance.rs:454`]({link(conc_rs, 454)})) enumerates the
-`2^F=4` founder-allele assignments produced by
+`2^F=4` letter-allele mappings produced by
 [`Iht::founder_phase_orientations`]({link(iht_rs, 492)}) (invoked
 inside `find_best_phase_orientation` at
-[`gtg_concordance.rs:256`]({link(conc_rs, 256)})). Each assignment
+[`gtg_concordance.rs:256`]({link(conc_rs, 256)})). Each mapping
 chooses which of dad's two sorted VCF alleles is tagged `A` vs `B`
 and which of mom's two is tagged `C` vs `D` — recall that the
 founders' letters are *unphased* (A/B, C/D), whereas each kid's
 letter pair is *phased* (paternal letter | maternal letter) by
-construction of the block. Under a given assignment,
+construction of the block. Under a given mapping,
 [`Iht::assign_genotypes`]({link(iht_rs, 442)}) (driver call at
 [`gtg_concordance.rs:487`]({link(conc_rs, 487)}) on the failing branch
 and [`gtg_concordance.rs:514`]({link(conc_rs, 514)}) on the passing
@@ -3002,18 +3002,17 @@ the observed unphased kid genotype by
 [`gtg_concordance.rs:268`]({link(conc_rs, 268)})), which counts how
 many kids disagree.
 
-At site `N1`, exactly one of the four assignments explains every kid
+At site `N1`, exactly one of the four mappings explains every kid
 simultaneously; the three others each force a mismatch somewhere.
-The winning assignment fixes the letter→allele map at this site, and
-the kids' phased letter pairs immediately give the phased `p|m`
-genotypes shown in the "kids (phased)" column.
+Under the winning mapping, the kids' phased letter pairs immediately
+give the phased `p|m` genotypes shown in the "kids (phased)" column.
 
 ## 4. The "impossible genotype" rule
 
-![Figure 3 — No founder-allele assignment fits site N2 (injected error)](fig3.png)
+![Figure 3 — No letter-allele mapping fits site N2 (injected error)](fig3.png)
 
-At site `N2` the injected error means **no** assignment produces zero
-mismatches — the best any assignment can do is {n2_min_mis} sample(s)
+At site `N2` the injected error means **no** mapping produces zero
+mismatches — the best any mapping can do is {n2_min_mis} sample(s)
 disagreeing. `find_best_phase_orientation` therefore returns a
 non-empty mismatch list, the driver writes the record to
 `{{prefix}}.fail.vcf` at
