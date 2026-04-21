@@ -2911,7 +2911,7 @@ the driver — `main()` in
 [`gtg_concordance.rs`]({link(conc_rs, 315)}) — so you can step through
 the driver source in parallel with this walkthrough.
 
-The toy simulation reuses the left half of the nuclear-family block
+The toy simulation reuses the [left half of the nuclear-family block](https://github.com/petermchale/Platinum-Pedigree-Inheritance/blob/main/wiki/nuclear_family/fig4_2.png)
 (Kid1=(A,C), Kid2=(B,D), Kid3=(A,C)) and adds two sites where both
 parents are heterozygous. These are NON-informative for `gtg-ped-map`
 because [`unique_allele`]({link(map_rs, 243)}) returns `None` at each
