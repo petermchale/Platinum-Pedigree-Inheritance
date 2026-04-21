@@ -2927,9 +2927,9 @@ python wiki/generate_wiki.py --page concordance
 which regenerates both the figure PNGs referenced here and this
 markdown file itself.
 
-## 1. Block letter map — the input to `gtg-concordance`
+## 1. Block letter map — an input to `gtg-concordance`
 
-![Figure 1 — Block letter map (input to gtg-concordance)](fig1.png)
+![Figure 1 — Block letter map (an input to gtg-concordance)](fig1.png)
 
 The driver reads the `{{prefix}}.iht.txt` file produced by
 `gtg-ped-map` using
