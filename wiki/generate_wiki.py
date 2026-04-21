@@ -2639,8 +2639,6 @@ and [`perform_flips_in_place`]({link(map_rs, 702)})) run
 per-individual-column across records. The underlying object is
 the same.
 
-### 3.1 What actually differs: the algorithm, not the representation
-
 Both Lander-Green and `gtg-ped-map` condition on the per-site
 genotypes and both produce per-site inheritance vectors. The
 difference is *how*.
