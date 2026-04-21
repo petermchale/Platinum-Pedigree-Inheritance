@@ -2663,21 +2663,19 @@ classical inheritance vector of Lander & Green.)
 
 ![Figure 3 — Recursive informative-site deduction (G2 -> G3)](fig3.png)
 
-Figure 3 shows the letters written on the two grandchildren's
-slots at the **informative sites only** (non-informative sites are
-rendered as `.`). This is the state of the `Iht` grid for triple 2
-after [`track_alleles_through_pedigree`]({link(map_rs, 295)}) has
-tagged the carrier homolog at each informative site (Step 2 of
-[nuclear_family §3](../nuclear_family/nuclear_family.md#3-informative-site-detection-founder-letter-tagging-and-haplotype-inference-within-a-linkage-block))
-*and* [`backfill_sibs`]({link(map_rs, 804)}) has written the
-parent's other letter onto the non-carrier grandchild (Step 3a).
-That is why, at every Spouse-informative site, both `E` and `F`
-appear — one tagged directly as the carrier of Spouse's unique
-allele, the other filled in by `backfill_sibs`; the same is true
-of the Kid3-informative sites on the maternal row. (With only two
-grandchildren the Step-3b swap-by-majority is a tie and fires no
-swap, so Step 3a's letters are also the final ones.) The two
-indicator rows mark:
+Figure 3 shows the letters on the two grandchildren's slots at
+the **informative sites only** (non-informative sites are rendered
+as `.`). For the **Spouse-informative** sites the state shown is
+exactly the end-of-Step-3 state of
+[nuclear_family §3](../nuclear_family/nuclear_family.md#3-informative-site-detection-founder-letter-tagging-and-haplotype-inference-within-a-linkage-block):
+[`track_alleles_through_pedigree`]({link(map_rs, 295)}) tags the
+carrier (Step 2) and
+[`backfill_sibs`]({link(map_rs, 804)}) writes the other letter on
+the non-carrier (Step 3a). For the **Kid3-informative** sites the
+state shown is more mixed — the bullet below explains why — and
+should be read as the **final post-pipeline state** after the
+across-site block-continuity passes discussed in §5 have also run.
+The two indicator rows mark:
 
 - **Spouse-informative** (Spouse het × Kid3 hom) at sites
   `{spouse_info_sites}`. The unique paternal allele tags whichever
@@ -2685,14 +2683,52 @@ indicator rows mark:
   in mechanics to the dad-informative case on the nuclear-family
   page.
 - **Kid3-informative** (Kid3 het × Spouse hom) at sites
-  `{kid3_info_sites}`. The letter written on each grandchild's
-  maternal slot is whichever of Kid3's own per-site G1 letters —
-  `A`, `B`, or `C` — sits on the homolog carrying Kid3's unique
-  allele at that site. This is the only real novelty of the G3
-  iteration: the carrier letter varies from site to site along
-  Kid3's row, whereas in the nuclear-family case the carrier letter
-  was always `A` (from Dad's fixed `(A, B)`) or `C` (from Mom's
-  fixed `(C, D)`).
+  `{kid3_info_sites}`. The nuclear-family §3 rule — "tag carriers
+  with the parent's first letter at Step 2, backfill non-carriers
+  with the parent's other letter at Step 3" — still applies *at
+  Step 2* here:
+  [`find_valid_char`]({link(map_rs, 285)}) on Kid3's slot pair
+  returns the first valid entry (her paternal-slot letter, `A` at
+  sites 0–3 and `B` at sites 4–7), and
+  [`track_alleles_through_pedigree`]({link(map_rs, 295)}) writes
+  that letter onto every grandchild carrying Kid3's unique allele.
+  *But Step 3 does not run for Kid3's grandchildren.*
+  [`backfill_sibs`]({link(map_rs, 804)}) iterates only
+  `iht.founders` ([`map_builder.rs:807`]({link(map_rs, 807)})), so
+  it fills non-carriers of founders like Spouse and never visits
+  non-carriers of Kid3. Non-carrier grandchildren at
+  Kid3-informative sites therefore remain `?` after Step 3.
+
+  Those `?` slots are filled later by the across-site, block-continuity
+  passes [`fill_missing_values`]({link(map_rs, 617)}) and
+  [`fill_missing_values_by_neighbor`]({link(map_rs, 540)}) (and any
+  per-block label conventions are reconciled by
+  [`perform_flips_in_place`]({link(map_rs, 702)})). The net final
+  state satisfies a simpler *descriptive* rule — each grandchild's
+  maternal-slot letter equals the letter on whichever Kid3 homolog
+  it inherited — but no single Rust pass writes all of those letters
+  directly. Two worked examples against Fig 2:
+  - **Site 1** (Step-2 writes both). Kid3 is `01` with `(pat=1, mat=0)`
+    (letters `A`, `C`); Spouse is `00`, so Kid3's unique allele is `1`,
+    on her paternal homolog. Both GK1 and GK2 are `01` — both are
+    carriers — so Step 2 writes `A` (find_valid_char = pat letter)
+    on both. That matches Fig 3.
+  - **Site 0** (Step 2 writes nothing; filled later). Kid3 is `01`
+    with `(pat=0, mat=1)` (letters `A`, `C`); unique allele `1` is on
+    mat. Both GKs are `00`, so neither is a carrier; Step 2 writes
+    nothing; `backfill_sibs` skips Kid3. Both `?` slots are filled by
+    `fill_missing_values` from the nearest non-`?` neighbour (site 1,
+    where both GKs are `A`), giving `A` at site 0 — again matching
+    Fig 3 and the "inherited-homolog-letter" description (both GKs
+    physically inherited Kid3's paternal homolog at sites 0–5).
+
+  The real novelty of the G3 iteration is that Kid3's paternal-slot
+  letter itself varies along the row — `A` at sites 0–3 and `B` at
+  sites 4–7, because of her own G1 ancestral crossover — so the
+  "first letter to carriers" rule writes a letter that changes
+  along the row. For founders like Dad or Mom the per-homolog
+  letters were constant across the block, pinned once and for all
+  by [`Iht::new`]({link(iht_rs, 172)}).
 
 Everything after Step 2 runs *outside* the triple walk and is not
 re-walked here. [`backfill_sibs`]({link(map_rs, 804)}) is applied
