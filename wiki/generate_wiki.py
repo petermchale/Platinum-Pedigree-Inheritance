@@ -2678,8 +2678,14 @@ def component_3_concordance(out_dir: Path) -> None:
     s1 = per_site[0]
     obs1 = s1["observed"]
 
-    assign_cols = ["assignment", "kids (phased)", "kids (unphased)", "#mis"]
-    assign_widths = [20, 22, 22, 5]
+    assign_cols = [
+        "founder assignment",
+        "kids (expected, phased)",
+        "kids (expected, unphased)",
+        "kids (observed, unphased)",
+        "#mis",
+    ]
+    assign_widths = [20, 25, 27, 27, 5]
 
     body_2 = [
         f"Figure 2 — Enumerating letter-allele mappings at site {s1['label']} (clean pass)",
@@ -2713,6 +2719,11 @@ def component_3_concordance(out_dir: Path) -> None:
         _cols(assign_cols, assign_widths),
         _cols(["-" * (w - 1) for w in assign_widths], assign_widths),
     ]
+    observed_unphased = (
+        f"K1={_fmt_gt(obs1['Kid1'])} "
+        f"K2={_fmt_gt(obs1['Kid2'])} "
+        f"K3={_fmt_gt(obs1['Kid3'])}"
+    )
     for dl, ml, exp, nmis in s1["orient_results"]:
         dad_pair = _sorted_unphased(obs1["Dad"])
         mom_pair = _sorted_unphased(obs1["Mom"])
@@ -2725,7 +2736,7 @@ def component_3_concordance(out_dir: Path) -> None:
             f"K2={_fmt_phased(exp['Kid2'])} "
             f"K3={_fmt_phased(exp['Kid3'])}"
         )
-        unphased = (
+        expected_unphased = (
             f"K1={_fmt_gt(exp['Kid1'])} "
             f"K2={_fmt_gt(exp['Kid2'])} "
             f"K3={_fmt_gt(exp['Kid3'])}"
@@ -2733,7 +2744,7 @@ def component_3_concordance(out_dir: Path) -> None:
         star = "   <- winner" if nmis == 0 else ""
         body_2.append(
             _cols(
-                [assignment, phased, unphased, str(nmis)],
+                [assignment, phased, expected_unphased, observed_unphased, str(nmis)],
                 assign_widths,
                 star,
             )
@@ -3005,7 +3016,8 @@ many kids disagree.
 At site `N1`, exactly one of the four mappings explains every kid
 simultaneously; the three others each force a mismatch somewhere.
 Under the winning mapping, the kids' phased letter pairs immediately
-give the phased `p|m` genotypes shown in the "kids (phased)" column.
+give the phased `p|m` genotypes shown in the
+"kids (expected, phased)" column.
 
 ## 4. The "impossible genotype" rule
 
