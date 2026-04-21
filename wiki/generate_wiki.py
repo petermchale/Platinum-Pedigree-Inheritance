@@ -2666,11 +2666,37 @@ Two consequences worth stating explicitly:
   *Nat. Genet.* 30:97–101, 2002). For this pedigree that would be
   a joint vector of length 10 over the founder-homolog alphabet
   `{{A, B, C, D, E, F}}` (two slots each for Kid1, Kid2, Kid3, GK1,
-  GK2). `gtg-ped-map` never assembles that object. Instead, each
-  individual — founder or not — ends each VCF record with just its
-  own two letters, one per homolog; the per-site representation
+  GK2). Concretely, at **site 4** of the toy simulation (the first
+  site after the ancestral `A → B` crossover on Kid3's paternal
+  homolog), that joint vector would be
+
+  ```
+  ( Kid1_pat, Kid1_mat, Kid2_pat, Kid2_mat, Kid3_pat, Kid3_mat,
+    GK1_pat,  GK1_mat,  GK2_pat,  GK2_mat )
+  = ( A, C, B, D, B, C, E, B, F, B )
+  ```
+
+  held as one 10-coordinate object that a Lander-Green forward-backward
+  pass would maintain a distribution over. `gtg-ped-map` never
+  assembles that object. What it actually stores at site 4 is five
+  independent two-letter pairs, written to five different rows of the
+  `Iht` grid:
+
+  | individual | pair at site 4 |
+  |---|---|
+  | Kid1 | `(A, C)` |
+  | Kid2 | `(B, D)` |
+  | Kid3 | `(B, C)` |
+  | GK1  | `(E, B)` |
+  | GK2  | `(F, B)` |
+
+  The same information, but scattered across per-individual rows with
+  no joint state to index into: the walk visits (parent, spouse,
+  child) triples one at a time and writes pairs independently; no step
+  of the algorithm enumerates, intersects, or marginalises over the
+  `2^10` joint inheritance-vector states. The per-site representation
   stays per-individual, not per-pedigree, and adding a generation
-  does not widen it.
+  does not widen it — it just adds two rows.
 - **Non-founder parents are first-class.** Their letters just happen
   to vary across sites, whereas founder letters are constant. Kid3
   plays the parent role in triple 2 without any special casing
