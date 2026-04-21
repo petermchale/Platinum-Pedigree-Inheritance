@@ -2688,11 +2688,11 @@ def component_3_concordance(out_dir: Path) -> None:
     assign_widths = [20, 25, 27, 27, 5]
 
     body_2 = [
-        f"Figure 2 — Enumerating letter-allele mappings at site {s1['label']} (clean pass)",
+        f"Figure 2 — Deducing variant phase by exhaustive enumeration at site {s1['label']} (clean pass)",
         "",
         "Inputs consumed at this site:",
         "",
-        "  (A) Observed VCF genotypes (unphased):",
+        "  (A) Observed unphased genotypes (read from VCF):",
         f"      Dad  = {_fmt_gt(obs1['Dad'])}   Mom  = {_fmt_gt(obs1['Mom'])}",
         f"      Kid1 = {_fmt_gt(obs1['Kid1'])}   "
         f"Kid2 = {_fmt_gt(obs1['Kid2'])}   "
@@ -2761,7 +2761,7 @@ def component_3_concordance(out_dir: Path) -> None:
     assign_widths_slim = [20, 22, 5]
 
     body_3 = [
-        f"Figure 3 — No letter-allele mapping fits site {s2['label']} (injected error)",
+        f"Figure 3 — Failing to deduce variant phase by exhaustive enumeration at site {s2['label']} (injected error)",
         "",
         f"Site {s2['label']} (ERROR):  "
         f"Dad={_fmt_gt(obs2['Dad'])}  "
@@ -2985,11 +2985,11 @@ phased `pass.vcf` record or a quarantined `fail.vcf` record.
 
 Site `N2` carries an **injected sequencing error**: Kid1 is reported
 as `1/1` even though the simulation truth is `0/1`. This is the case
-that the "impossible genotype" rule in Figure 3 is designed to catch.
+Figure 3 covers, where exhaustive enumeration finds no consistent phase.
 
-## 3. Enumerating letter-allele mappings at a clean site
+## 3. Deducing variant phase by exhaustive enumeration at a clean site
 
-![Figure 2 — Enumerating letter-allele mappings at site N1 (clean pass)](fig2.png)
+![Figure 2 — Deducing variant phase by exhaustive enumeration at site N1 (clean pass)](fig2.png)
 
 At every record inside a block,
 [`find_best_phase_orientation`]({link(conc_rs, 252)}) (driver call at
@@ -3019,9 +3019,9 @@ Under the winning mapping, the kids' phased letter pairs immediately
 give the phased `p|m` genotypes shown in the
 "kids (expected, phased)" column.
 
-## 4. The "impossible genotype" rule
+## 4. Failing to deduce variant phase by exhaustive enumeration at an error site
 
-![Figure 3 — No letter-allele mapping fits site N2 (injected error)](fig3.png)
+![Figure 3 — Failing to deduce variant phase by exhaustive enumeration at site N2 (injected error)](fig3.png)
 
 At site `N2` the injected error means **no** mapping produces zero
 mismatches — the best any mapping can do is {n2_min_mis} sample(s)
