@@ -2504,12 +2504,17 @@ become visible once a third generation is in the pedigree:
    (at each such site, write one of the parent's two letters onto
    whichever child-homolog carries the parent's unique allele) —
    is **a single ancestor-first walk** that considers G1, G2 and G3
-   together, iterating over (parent, spouse, child) triples in depth
-   order. For this pedigree the walk visits two
-   triples back-to-back, and by the time it reaches the second triple
-   the G2 parent's letters have already been written into her slot
-   pair — so they serve as "parent letters" for the G3 sub-problem
-   without any special casing.
+   together, iterating over (parent, spouse, child) triples in
+   **depth order** — an ordering that processes founders first,
+   then their children, then their grandchildren, so that a
+   non-founder parent's letters are always in place before she is
+   asked to play the parent role in a later triple (§3 gives the
+   precise definition and this pedigree's depth assignments). For
+   this pedigree the walk visits two triples back-to-back, and by
+   the time it reaches the second triple the G2 parent's letters
+   have already been written into her slot pair — so they serve as
+   "parent letters" for the G3 sub-problem without any special
+   casing.
 
    It is worth emphasising that the rest of the nuclear-family
    pipeline is **not** part of this walk. Sibship backfilling
@@ -2609,9 +2614,24 @@ The routine
 [`track_alleles_through_pedigree`]({link(map_rs, 295)}) (driver call
 at [`map_builder.rs:1116`]({link(map_rs, 1116)})) is called once
 per VCF record and walks every (parent, spouse, child) triple in
-ancestor-first depth order given by `family.get_individual_depths()`
-(see [`ped.rs`](https://github.com/{REPO}/blob/{SHA}/{ped_rs})). For
-this pedigree there are two triples, in this order:
+ancestor-first depth order given by
+[`family.get_individual_depths()`]({link(ped_rs, 155)}).
+
+*Depth order* here means: every founder has depth 0, and every
+non-founder has depth equal to the longest path from any founder
+down to that individual (equivalently, one more than the maximum
+depth among its two parents). The function does a breadth-first
+sweep from the founders, recording each individual's maximum
+depth, then returns the list of individuals sorted by depth
+ascending (ties broken alphabetically by ID). Iterating triples in
+that order guarantees that when a triple `(P, S) → {{C ...}}` is
+visited, both `P` and `S` have already been handled — either as
+founders whose slot pairs were pre-filled by [`Iht::new`]({link(iht_rs, 172)}),
+or as children of a shallower triple whose letters were written by
+a previous iteration — so their slot pairs already hold the
+letters the current triple needs to read. For this pedigree the
+depths are Dad = Mom = Spouse = 0, Kid1 = Kid2 = Kid3 = 1, and
+GK1 = GK2 = 2, and the walk visits two triples in this order:
 
 1. **`(Dad, Mom) → {{Kid1, Kid2, Kid3}}`** — the nuclear-family
    iteration. Its output, for the Kid3 row in particular, is what
