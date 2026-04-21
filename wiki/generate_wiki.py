@@ -2964,8 +2964,9 @@ sample's depth and (unphased, index-sorted) allele vector into a
 short-circuited straight to `{{prefix}}.fail.vcf` at
 [`gtg_concordance.rs:444`]({link(conc_rs, 444)}) and
 [`gtg_concordance.rs:450`]({link(conc_rs, 450)}); everything else is
-handed to the per-site phasing loop at
-[`gtg_concordance.rs:437`]({link(conc_rs, 437)}) — including variants
+handed to the per-site phasing step —
+[`find_best_phase_orientation`]({link(conc_rs, 252)}) at
+[`gtg_concordance.rs:454`]({link(conc_rs, 454)}) — including variants
 that `gtg-ped-map` could not use because neither parent has a unique
 allele.
 
