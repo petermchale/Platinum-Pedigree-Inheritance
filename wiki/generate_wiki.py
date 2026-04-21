@@ -2111,60 +2111,6 @@ def component_2_three_generations(out_dir: Path) -> None:
     _render_panel_image(body_1, tg_dir / "fig1.png")
 
     # ------------------------------------------------------------------
-    # Figure 2 — unphased VCF rows for the G2->G3 nuclear unit.
-    # ------------------------------------------------------------------
-    def _fmt_gt(g: str) -> str:
-        return g[0] + g[2] if g[0] == g[2] else "01"
-
-    body_2 = [
-        "Figure 2 — Unphased VCF rows for the G2->G3 pass",
-        "",
-        "Spouse (dad):   " + " ".join(_fmt_gt(g) for g in spouse_unphased),
-        "Kid3 (mom)  :   " + " ".join(_fmt_gt(g) for g in kid3_unphased),
-        "GK1         :   " + " ".join(_fmt_gt(g) for g in gk_unphased["GK1"]),
-        "GK2         :   " + " ".join(_fmt_gt(g) for g in gk_unphased["GK2"]),
-        "",
-        "(0/0 rendered as '00', 0/1 as '01', 1/1 as '11')",
-    ]
-    _render_panel_image(body_2, tg_dir / "fig2.png")
-
-    # ------------------------------------------------------------------
-    # Figure 3 — recursive informative-site deduction.
-    # Row layout mirrors nuclear_family/fig3: paternal-indicator row first,
-    # then maternal-indicator row, then per-grandkid (p, m) rows with the
-    # paternal row always directly above its matching maternal row.
-    # ------------------------------------------------------------------
-    row_prefix_width = len("  GK1 p:    ")
-
-    def mark_sites(site_list: List[int]) -> str:
-        marks = ["_"] * num_sites
-        for s in site_list:
-            marks[s] = "*"
-        return (" " * row_prefix_width) + " ".join(marks)
-
-    body_3 = [
-        "Figure 3 — Recursive informative-site deduction (G2 -> G3)",
-        "",
-        "Deduced founder-letter labels at informative sites only",
-        "('.' = site not informative for that slot):",
-        "",
-        mark_sites(spouse_info_sites) + "   <- Spouse-informative (Spouse het x Kid3 hom)",
-        mark_sites(kid3_info_sites)   + "   <- Kid3-informative   (Kid3 het x Spouse hom)",
-    ]
-    for g in grandkids:
-        pat_row = f"  {g} p:    " + " ".join(
-            paternal_deduced[g][i] if i in spouse_info_sites else "."
-            for i in range(num_sites)
-        )
-        mat_row = f"  {g} m:    " + " ".join(
-            maternal_deduced[g][i] if i in kid3_info_sites else "."
-            for i in range(num_sites)
-        )
-        body_3.append(pat_row)
-        body_3.append(mat_row)
-    _render_panel_image(body_3, tg_dir / "fig3.png")
-
-    # ------------------------------------------------------------------
     # Figure 4 — collapsed blocks showing the ancestral crossover shared
     # between GK1 and GK2, plus the per-meiosis crossover unique to GK1.
     # ------------------------------------------------------------------
@@ -2274,16 +2220,16 @@ def component_2_three_generations(out_dir: Path) -> None:
 
     sp_mark_6, k3_mark_6 = mark_sites_6(spouse_info_sites, kid3_info_sites)
 
-    # Figure 6.1 — grandkid inherited-allele grid.
+    # Figure 5.1 — grandkid inherited-allele grid.
     body_6_1 = [
-        "Figure 6.1 — Allele inherited by each grandkid on the informative slot",
+        "Figure 5.1 — Allele inherited by each grandkid on the informative slot",
         "",
         "At a Spouse-informative site (*) the entry is the 0/1 allele",
         "the grandkid inherited from Spouse on its paternal slot; at a",
         "Kid3-informative site (+) it is the allele the grandkid",
         "inherited from Kid3 on its maternal slot. '.' = site not",
         "informative for this slot. Each value is deduced from the VCF",
-        "in Figure 2 alone (subtract the homozygous parent's fixed",
+        "genotypes alone (subtract the homozygous parent's fixed",
         "contribution from the grandkid's genotype; the other allele is",
         "from the heterozygous parent).",
         "",
@@ -2297,9 +2243,9 @@ def component_2_three_generations(out_dir: Path) -> None:
         body_6_1.append(
             f"  {g} m:    " + " ".join(gk_mat_row[g])
         )
-    _render_panel_image(body_6_1, tg_dir / "fig6_1.png")
+    _render_panel_image(body_6_1, tg_dir / "fig5_1.png")
 
-    # Figure 6.2 — pairwise (GK1, GK2) agreement.
+    # Figure 5.2 — pairwise (GK1, GK2) agreement.
     def _pair_cmp(
         rows: Dict[str, List[str]], info_sites: List[int]
     ) -> List[str]:
@@ -2319,7 +2265,7 @@ def component_2_three_generations(out_dir: Path) -> None:
     mat_pair = _pair_cmp(gk_mat_row, kid3_info_sites)
 
     body_6_2 = [
-        "Figure 6.2 — Pairwise agreement of grandkid gamete alleles",
+        "Figure 5.2 — Pairwise agreement of grandkid gamete alleles",
         "",
         "'=' means both grandkids inherited the same parental homolog",
         "at that site; 'X' means different; '.' = site not informative",
@@ -2337,9 +2283,9 @@ def component_2_three_generations(out_dir: Path) -> None:
         "simply says GK1 and GK2 inherited different Spouse homologs",
         "(E vs F) — no recombination signal, because Spouse is a founder.",
     ]
-    _render_panel_image(body_6_2, tg_dir / "fig6_2.png")
+    _render_panel_image(body_6_2, tg_dir / "fig5_2.png")
 
-    # Figure 6.3 — label propagation from Kid3/Spouse to grandkids.
+    # Figure 5.3 — label propagation from Kid3/Spouse to grandkids.
     def _fmt_row(values: List[str], restrict: List[int]) -> List[str]:
         return [values[i] if i in restrict else "." for i in range(num_sites)]
 
@@ -2392,11 +2338,11 @@ def component_2_three_generations(out_dir: Path) -> None:
     gk_pat_letters = {g: _gk_letter_by_match(g, "p") for g in grandkids}
 
     body_6_3 = [
-        "Figure 6.3 — Propagating Kid3 and Spouse labels to the grandkids",
+        "Figure 5.3 — Propagating Kid3 and Spouse labels to the grandkids",
         "",
         "At each informative site the parent is heterozygous, so the",
         "parent's two physical homologs carry DIFFERENT 0/1 alleles.",
-        "The grandkid's inherited-allele value (from Figure 6.1) matches",
+        "The grandkid's inherited-allele value (from Figure 5.1) matches",
         "exactly one of those two homologs — copy that homolog's G1",
         "letter to the grandkid's row. Kid3's per-site letters come from",
         "the nuclear-family G1 pass (paternal A for sites 0-3, B for",
@@ -2441,7 +2387,7 @@ def component_2_three_generations(out_dir: Path) -> None:
         "Kid3's maternal homolog — the per-meiosis G2 crossover).",
         "GK2's trace A A . . B B B B shows only the ancestral A -> B.",
     ]
-    _render_panel_image(body_6_3, tg_dir / "fig6_3.png")
+    _render_panel_image(body_6_3, tg_dir / "fig5_3.png")
 
     # ------------------------------------------------------------------
     # Markdown narrative.
@@ -2508,7 +2454,7 @@ become visible once a third generation is in the pedigree:
    **depth order** — an ordering that processes founders first,
    then their children, then their grandchildren, so that a
    non-founder parent's letters are always in place before she is
-   asked to play the parent role in a later triple (§3 gives the
+   asked to play the parent role in a later triple (§2 gives the
    precise definition and this pedigree's depth assignments). For
    this pedigree the walk visits two triples back-to-back, and by
    the time it reaches the second triple the G2 parent's letters
@@ -2569,9 +2515,9 @@ the pedigree the [nuclear-family page](../nuclear_family/nuclear_family.md)
 walks through. On this page Kid3 then marries **Spouse**, a fresh
 founder, adding the **G2→G3** layer `(Kid3, Spouse) → {{GK1, GK2}}`.
 
-Kid1 and Kid2 are not shown in the genotype figures below, but they
-are still part of the pedigree the algorithm processes, and their
-presence is load-bearing: the [multi-child guard in
+Kid1 and Kid2 are not drawn in Figure 1, but they are still part
+of the pedigree the algorithm processes, and their presence is
+load-bearing: the [multi-child guard in
 `backfill_sibs`]({link(map_rs, 818)}) disables partition inference
 for single-child families, so Kid3's `A`/`B` paternal labels and `C`
 maternal label exist only because Kid1 and Kid2 anchor the partition
@@ -2597,18 +2543,7 @@ Transmission in the toy simulation:
 - **GK2** inherits Spouse's `F` homolog on the paternal slot, plus
   Kid3's paternal homolog unrecombined (letters `A,A,A,A,B,B,B,B`).
 
-## 2. Unphased VCF rows for the G2→G3 triple
-
-![Figure 2 — Unphased VCF rows for the G2->G3 pass](fig2.png)
-
-Figure 2 shows only the rows that are new relative to the
-nuclear-family page: Kid3 (now read in the *parent* role), Spouse,
-GK1 and GK2. The Kid1 and Kid2 rows used to compute Kid3's G1
-labels are identical to the ones in
-[nuclear_family §2](../nuclear_family/nuclear_family.md#2-unphased-vcf-input)
-and are not repeated here.
-
-## 3. One ancestor-first walk, two triples
+## 2. One ancestor-first walk, two triples
 
 The routine
 [`track_alleles_through_pedigree`]({link(map_rs, 295)}) (driver call
@@ -2657,95 +2592,14 @@ parents are first-class** in this walk. Their letters just happen
 to vary across sites, whereas founder letters are constant. Kid3
 plays the parent role in triple 2 without any special casing beyond
 "look up whichever letter sits on the relevant homolog at this
-particular site." (§4 below takes up the relationship between the
+particular site." (§3 below takes up the relationship between the
 `(paternal, maternal)` letter pair the walk writes and the
 classical inheritance vector of Lander & Green.)
 
-![Figure 3 — Recursive informative-site deduction (G2 -> G3)](fig3.png)
-
-Figure 3 shows the letters on the two grandchildren's slots at
-the **informative sites only** (non-informative sites are rendered
-as `.`). For the **Spouse-informative** sites the state shown is
-exactly the end-of-Step-3 state of
-[nuclear_family §3](../nuclear_family/nuclear_family.md#3-informative-site-detection-founder-letter-tagging-and-haplotype-inference-within-a-linkage-block):
-[`track_alleles_through_pedigree`]({link(map_rs, 295)}) tags the
-carrier (Step 2) and
-[`backfill_sibs`]({link(map_rs, 804)}) writes the other letter on
-the non-carrier (Step 3a). For the **Kid3-informative** sites the
-state shown is more mixed — the bullet below explains why — and
-should be read as the **final post-pipeline state** after the
-across-site block-continuity passes discussed in §5 have also run.
-The two indicator rows mark:
-
-- **Spouse-informative** (Spouse het × Kid3 hom) at sites
-  `{spouse_info_sites}`. The unique paternal allele tags whichever
-  Spouse homolog (`E` or `F`) each grandchild inherited — identical
-  in mechanics to the dad-informative case on the nuclear-family
-  page.
-- **Kid3-informative** (Kid3 het × Spouse hom) at sites
-  `{kid3_info_sites}`. The nuclear-family §3 rule — "tag carriers
-  with the parent's first letter at Step 2, backfill non-carriers
-  with the parent's other letter at Step 3" — still applies *at
-  Step 2* here:
-  [`find_valid_char`]({link(map_rs, 285)}) on Kid3's slot pair
-  returns the first valid entry (her paternal-slot letter, `A` at
-  sites 0–3 and `B` at sites 4–7), and
-  [`track_alleles_through_pedigree`]({link(map_rs, 295)}) writes
-  that letter onto every grandchild carrying Kid3's unique allele.
-  *But Step 3 does not run for Kid3's grandchildren.*
-  [`backfill_sibs`]({link(map_rs, 804)}) iterates only
-  `iht.founders` ([`map_builder.rs:807`]({link(map_rs, 807)})), so
-  it fills non-carriers of founders like Spouse and never visits
-  non-carriers of Kid3. Non-carrier grandchildren at
-  Kid3-informative sites therefore remain `?` after Step 3.
-
-  Those `?` slots are filled later by the across-site, block-continuity
-  passes [`fill_missing_values`]({link(map_rs, 617)}) and
-  [`fill_missing_values_by_neighbor`]({link(map_rs, 540)}) (and any
-  per-block label conventions are reconciled by
-  [`perform_flips_in_place`]({link(map_rs, 702)})). The net final
-  state satisfies a simpler *descriptive* rule — each grandchild's
-  maternal-slot letter equals the letter on whichever Kid3 homolog
-  it inherited — but no single Rust pass writes all of those letters
-  directly. Two worked examples against Fig 2:
-  - **Site 1** (Step-2 writes both). Kid3 is `01` with `(pat=1, mat=0)`
-    (letters `A`, `C`); Spouse is `00`, so Kid3's unique allele is `1`,
-    on her paternal homolog. Both GK1 and GK2 are `01` — both are
-    carriers — so Step 2 writes `A` (find_valid_char = pat letter)
-    on both. That matches Fig 3.
-  - **Site 0** (Step 2 writes nothing; filled later). Kid3 is `01`
-    with `(pat=0, mat=1)` (letters `A`, `C`); unique allele `1` is on
-    mat. Both GKs are `00`, so neither is a carrier; Step 2 writes
-    nothing; `backfill_sibs` skips Kid3. Both `?` slots are filled by
-    `fill_missing_values` from the nearest non-`?` neighbour (site 1,
-    where both GKs are `A`), giving `A` at site 0 — again matching
-    Fig 3 and the "inherited-homolog-letter" description (both GKs
-    physically inherited Kid3's paternal homolog at sites 0–5).
-
-  The real novelty of the G3 iteration is that Kid3's paternal-slot
-  letter itself varies along the row — `A` at sites 0–3 and `B` at
-  sites 4–7, because of her own G1 ancestral crossover — so the
-  "first letter to carriers" rule writes a letter that changes
-  along the row. For founders like Dad or Mom the per-homolog
-  letters were constant across the block, pinned once and for all
-  by [`Iht::new`]({link(iht_rs, 172)}).
-
-Everything after Step 2 runs *outside* the triple walk and is not
-re-walked here. [`backfill_sibs`]({link(map_rs, 804)}) is applied
-once per VCF record to the full family `Iht` after
-[`track_alleles_through_pedigree`]({link(map_rs, 295)}) returns;
-the per-site flip pass in
-[`perform_flips_in_place`]({link(map_rs, 702)}) and block collapse
-in [`collapse_identical_iht`]({link(map_rs, 385)}) (together with
-the two gap-fills discussed in §5) run later still, as global
-passes over the pooled record-by-individual grid. Adding triple 2
-to the pedigree widens that grid by two rows (GK1, GK2) and leaves
-every one of those routines unchanged.
-
-## 4. Relation to the Lander-Green inheritance vector
+## 3. Relation to the Lander-Green inheritance vector
 
 The per-individual `(paternal-slot letter, maternal-slot letter)`
-pairs that §3's walk writes into the `Iht` grid are, up to
+pairs that §2's walk writes into the `Iht` grid are, up to
 reshaping, an *inheritance vector* in the sense of Lander & Green
 (*PNAS* 84:2363–2367, [1987](https://doi.org/10.1073/pnas.84.8.2363))
 — not a different object. Concatenating the grid's per-individual
@@ -2785,7 +2639,7 @@ and [`perform_flips_in_place`]({link(map_rs, 702)})) run
 per-individual-column across records. The underlying object is
 the same.
 
-### 4.1 What actually differs: the algorithm, not the representation
+### 3.1 What actually differs: the algorithm, not the representation
 
 Both Lander-Green and `gtg-ped-map` condition on the per-site
 genotypes and both produce per-site inheritance vectors. The
@@ -2807,14 +2661,14 @@ linkage LOD scores, maximum-likelihood phasing, or imputed
 genotypes.
 
 **`gtg-ped-map`**, by contrast, does not build a probabilistic
-model. Per site, §3's triple walk deduces the inheritance vector
+model. Per site, §2's triple walk deduces the inheritance vector
 *deterministically* from Mendelian rules: the unique child
 carrying the parent's rare allele is the carrier, its
 informative-slot letter is fixed, and
 [`backfill_sibs`]({link(map_rs, 804)}) writes the parent's other
 letter on the non-carriers. No emission probabilities; no
 integration over founder alleles. Across sites, the
-flip / collapse / gap-fill pipeline (listed at the end of §3)
+flip / collapse / gap-fill pipeline (listed at the end of §2)
 deterministically *minimises the number of letter transitions
 between adjacent sites*, which is equivalent to maximising
 linkage-block length, or equivalently minimising the total number
@@ -2830,7 +2684,7 @@ block-maximising clean-up over adjacent sites. Both consume the
 same observed alleles — the difference is entirely in what is
 done with them.
 
-## 5. Ancestral vs de novo crossovers
+## 4. Ancestral vs de novo crossovers
 
 As emphasised in the intro, the flip, block-collapse and gap-fill
 routines — in driver-call order,
@@ -2908,7 +2762,7 @@ block map contains only founder letters; the 0/1 allele sequence of
 each haplotype is reconstructed downstream by `gtg-concordance`
 (see the [concordance walkthrough](../concordance/concordance.md)).
 
-## 6. The pairwise-comparison view, extended to three generations
+## 5. The pairwise-comparison view, extended to three generations
 
 [§5 of the nuclear-family page](../nuclear_family/nuclear_family.md#5-an-equivalent-pairwise-comparison-algorithm)
 showed that per-site Latin-letter machinery can be replaced by a
@@ -2919,9 +2773,9 @@ physical homologs vary from site to site (the ancestral `A → B`).
 Label propagation therefore requires a per-site lookup into Kid3's
 own G1 letters — i.e. a chain through the output of triple 1.
 
-### 6.1 Recover each grandchild's gamete allele
+### 5.1 Recover each grandchild's gamete allele
 
-![Figure 6.1 — Allele inherited by each grandchild on the informative slot](fig6_1.png)
+![Figure 5.1 — Allele inherited by each grandchild on the informative slot](fig5_1.png)
 
 At a Spouse-informative site Kid3 is homozygous, so Kid3's
 contribution to each grandchild's genotype is fixed; subtracting it
@@ -2929,9 +2783,9 @@ leaves the paternal-slot allele (from Spouse). The argument is
 symmetric at Kid3-informative sites. This is identical to §5.1 of the
 nuclear-family page with Kid3 standing in for Dad and Spouse for Mom.
 
-### 6.2 Pairwise agreement between the grandchildren
+### 5.2 Pairwise agreement between the grandchildren
 
-![Figure 6.2 — Pairwise agreement of grandkid gamete alleles](fig6_2.png)
+![Figure 5.2 — Pairwise agreement of grandkid gamete alleles](fig5_2.png)
 
 `=` means GK1 and GK2 inherited the same parental homolog at that
 site; `X` means different.
@@ -2939,30 +2793,30 @@ site; `X` means different.
 - The **maternal** pair relation is `=` on sites 0, 1, 4, 5 and
   flips to `X` on sites 6, 7. That localises a crossover in Kid3's
   gamete to GK1 between sites 5 and 6 — the de novo crossover of
-  §5.
+  §4.
 - The **paternal** pair relation is `X` at both Spouse-informative
   sites. This just says GK1 and GK2 inherited different Spouse
   homologs (`E` vs `F`); it carries no recombination signal because
   Spouse is a founder whose two homologs never switch label.
 
 The key observation is that **the ancestral `A → B` crossover at
-sites 3/4 is invisible in Figure 6.2**. Both grandchildren inherited
+sites 3/4 is invisible in Figure 5.2**. Both grandchildren inherited
 Kid3's paternal homolog across sites 0–5, so the pairwise relation
 stays `=` throughout the span that contains the ancestral transition.
 A pairwise comparison between G3 sibs alone cannot detect a crossover
 that happened in G1; that crossover is buried inside Kid3's row and
-only becomes visible once §6.3 chains back to it.
+only becomes visible once §5.3 chains back to it.
 
-### 6.3 Propagate Kid3's G1 letters to the grandchildren
+### 5.3 Propagate Kid3's G1 letters to the grandchildren
 
-The partition from §6.2 tells us *whether* two grandchildren share a
+The partition from §5.2 tells us *whether* two grandchildren share a
 Kid3-homolog at each site, but not *which* letter to write. The
 bridge is the same observation the nuclear-family §5 used, but
 re-pointed at Kid3:
 
 > At every informative site the parent is heterozygous, so the
 > parent's two physical homologs carry *different* 0/1 alleles. The
-> grandchild's inherited-allele value (§6.1) therefore matches
+> grandchild's inherited-allele value (§5.1) therefore matches
 > exactly one of those two homologs. Copy that homolog's letter to
 > the grandchild's row.
 
@@ -2973,9 +2827,9 @@ from site to site — her G1-pass paternal trace reads
 `A A A A B B B B` and her maternal trace reads `C C C C C C C C` —
 so the lookup draws from a different letter at different sites.
 
-![Figure 6.3 — Propagating Kid3 and Spouse labels to the grandkids](fig6_3.png)
+![Figure 5.3 — Propagating Kid3 and Spouse labels to the grandkids](fig5_3.png)
 
-Both §5 transitions fall out of this lookup in different ways:
+Both §4 transitions fall out of this lookup in different ways:
 
 - **Ancestral `A → B` at sites 3/4.** On sites 0–5 both grandchildren's
   inherited maternal allele matches Kid3's paternal-homolog allele,
@@ -2990,17 +2844,17 @@ Both §5 transitions fall out of this lookup in different ways:
   continues to match Kid3's paternal homolog, so her letter stays on
   `B`. The flip is *produced* by GK1's crossover.
 
-This is the three-generation phrasing of the §5 contrast: an
+This is the three-generation phrasing of the §4 contrast: an
 ancestral crossover is a letter flip inside the parent's homolog row
 that passes through intact to every descendant sharing that homolog,
 while a de novo crossover is a jump *between* the parent's homolog
 rows inside a single gamete.
 
-### 6.4 What generalises, and what doesn't
+### 5.4 What generalises, and what doesn't
 
 The pairwise-comparison view remains clean as long as each
 non-founder parent's letter trace is known at every informative site
-of the current triple, so that §6.3's allele-match lookup has letters
+of the current triple, so that §5.3's allele-match lookup has letters
 to copy. In this simulation the overlap is perfect: every
 Kid3-informative site of triple 2 is also within the G1-informative
 region of triple 1 for the relevant Kid3 slot, so Kid3's
@@ -3018,9 +2872,9 @@ non-informative G1 sites via block continuity — exactly the job
 triple 2's carrier test reads those letters.
 
 So the *partition* information is still fully recoverable by
-pairwise allele comparison alone (§6.1–§6.2) regardless of pedigree
+pairwise allele comparison alone (§5.1–§5.2) regardless of pedigree
 depth; what generalises less cleanly is the *labelling* step
-(§6.3), which needs the chained per-site letter trace of every
+(§5.3), which needs the chained per-site letter trace of every
 non-founder parent. That asymmetry is why `gtg-ped-map` keeps Latin
 letters as its first-class representation and propagates them
 recursively through [`get_iht_markers`]({link(map_rs, 274)}), rather
