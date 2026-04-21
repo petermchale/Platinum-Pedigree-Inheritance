@@ -2618,12 +2618,12 @@ ancestor-first depth order given by
 [`family.get_individual_depths()`]({link(ped_rs, 155)}).
 
 *Depth order* here means: every founder has depth 0, and every
-non-founder has depth equal to the longest path from any founder
-down to that individual (equivalently, one more than the maximum
-depth among its two parents). The function does a breadth-first
-sweep from the founders, recording each individual's maximum
-depth, then returns the list of individuals sorted by depth
-ascending (ties broken alphabetically by ID). Iterating triples in
+non-founder has depth one greater than the deeper of its two
+parents — so a child of a founder and a non-founder sits one
+level below the non-founder parent, not below the founder. The
+function does a breadth-first sweep from the founders and returns
+the list of individuals sorted by depth ascending (ties broken
+alphabetically by ID). Iterating triples in
 that order guarantees that when a triple `(P, S) → {{C ...}}` is
 visited, both `P` and `S` have already been handled — either as
 founders whose slot pairs were pre-filled by [`Iht::new`]({link(iht_rs, 172)}),
