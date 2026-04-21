@@ -2675,25 +2675,6 @@ criterion, not a posterior; no genetic map is consulted.
 
 ## 4. Ancestral vs de novo crossovers
 
-As emphasised in the intro, the flip, block-collapse and gap-fill
-routines — in driver-call order,
-[`perform_flips_in_place`]({link(map_rs, 702)}) (at
-[`map_builder.rs:1135`]({link(map_rs, 1135)})),
-[`collapse_identical_iht`]({link(map_rs, 385)}) (at
-[`map_builder.rs:1191`]({link(map_rs, 1191)})),
-`perform_flips_in_place` again (at
-[`map_builder.rs:1193`]({link(map_rs, 1193)})),
-[`fill_missing_values`]({link(map_rs, 617)}) (at
-[`map_builder.rs:1200`]({link(map_rs, 1200)})),
-[`fill_missing_values_by_neighbor`]({link(map_rs, 540)}) (at
-[`map_builder.rs:1201`]({link(map_rs, 1201)})), and
-`perform_flips_in_place` once more (at
-[`map_builder.rs:1203`]({link(map_rs, 1203)})) — are **not** part
-of the ancestor-first walk. They run as global passes across the
-whole record-by-individual grid, see GK1 and GK2 as two additional
-rows alongside every other individual, and produce Figure 4 without
-any triple-level structure of their own.
-
 ![Figure 4 — Ancestral vs de novo crossovers after block collapse](fig4.png)
 
 Two maternal-row transitions appear, and the contrast between them
