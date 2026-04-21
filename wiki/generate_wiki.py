@@ -2675,15 +2675,6 @@ linkage-block length, or equivalently minimising the total number
 of inferred recombinations. That is a Hamming-style parsimony
 criterion, not a posterior; no genetic map is consulted.
 
-So the contrast is sharp. Lander-Green returns a posterior
-distribution over inheritance vectors under a probabilistic model
-with a recombination prior tied to genetic distance;
-`gtg-ped-map` returns a single deterministic inheritance-vector
-trace obtained by per-site Mendelian deduction followed by a
-block-maximising clean-up over adjacent sites. Both consume the
-same observed alleles — the difference is entirely in what is
-done with them.
-
 ## 4. Ancestral vs de novo crossovers
 
 As emphasised in the intro, the flip, block-collapse and gap-fill
