@@ -2627,35 +2627,7 @@ def component_3_concordance(out_dir: Path) -> None:
     c_dir.mkdir(parents=True, exist_ok=True)
 
     # ------------------------------------------------------------------
-    # Figure 1 — block letter map (the gtg-ped-map output that
-    # gtg-concordance reads in as its input).
-    # ------------------------------------------------------------------
-    body_1 = [
-        "Figure 1 — Phasing variants in an inheritance block",
-        "",
-        "Letter labels in the left half of the chromosome,",
-        "as written by gtg-ped-map into {prefix}.iht.txt:",
-        "",
-        "Dad  p:  A    <- founder, paternal homolog",
-        "Dad  m:  B    <- founder, maternal homolog",
-        "Mom  p:  C    <- founder, paternal homolog",
-        "Mom  m:  D    <- founder, maternal homolog",
-        "Kid1 p:  A",
-        "Kid1 m:  C",
-        "Kid2 p:  B",
-        "Kid2 m:  D",
-        "Kid3 p:  A    <- left half, before the paternal recomb",
-        "Kid3 m:  C",
-        "",
-        "These letters are constant inside one IHT block.",
-        "gtg-concordance re-reads the VCF for the same region and",
-        "attempts to phase EVERY variant in the block, not only the",
-        "informative ones that built it.",
-    ]
-    _render_panel_image(body_1, c_dir / "fig1.png")
-
-    # ------------------------------------------------------------------
-    # Figure 2 — the two non-informative sites inside the block.
+    # Figure 1 — the two non-informative sites inside the block.
     # ------------------------------------------------------------------
     site_cols = ["Site", "Dad", "Mom", "Kid1", "Kid2", "Kid3"]
     site_widths = [8, 6, 6, 6, 6, 6]
@@ -2664,8 +2636,8 @@ def component_3_concordance(out_dir: Path) -> None:
         parts = [f"{item:<{w}}" for item, w in zip(items, widths)]
         return "".join(parts).rstrip() + trailing
 
-    body_2 = [
-        "Figure 2 — Non-informative sites inside the block",
+    body_1 = [
+        "Figure 1 — Non-informative sites inside the block",
         "",
         "Two additional sites INSIDE the block where both parents are het:",
         "",
@@ -2674,7 +2646,7 @@ def component_3_concordance(out_dir: Path) -> None:
     for s in per_site:
         obs = s["observed"]
         tag = "   (ERROR)" if s["error"] else ""
-        body_2.append(
+        body_1.append(
             _cols(
                 [
                     s["label"],
@@ -2688,7 +2660,7 @@ def component_3_concordance(out_dir: Path) -> None:
                 tag,
             )
         )
-    body_2 += [
+    body_1 += [
         "",
         "At every site here, dad and mom are both 0/1:",
         "unique_allele(dad, mom) = {} and unique_allele(mom, dad) = {}",
@@ -2698,72 +2670,87 @@ def component_3_concordance(out_dir: Path) -> None:
         "Site N2 carries an INJECTED sequencing error: Kid1 observed as",
         "1/1 when the simulation truth is 0/1.",
     ]
-    _render_panel_image(body_2, c_dir / "fig2.png")
+    _render_panel_image(body_1, c_dir / "fig1.png")
 
     # ------------------------------------------------------------------
-    # Figure 3 — orientation enumeration at the clean site N1.
+    # Figure 2 — founder-allele-assignment enumeration at clean site N1.
     # ------------------------------------------------------------------
     s1 = per_site[0]
     obs1 = s1["observed"]
 
-    orient_cols_full = ["orient", "letter->allele map", "expected kids", "#mis"]
-    orient_widths_full = [13, 24, 24, 5]
+    assign_cols = ["assignment", "kids (phased)", "kids (unphased)", "#mis"]
+    assign_widths = [20, 22, 22, 5]
 
-    body_3 = [
-        f"Figure 3 — Four orientations at site {s1['label']} (clean pass)",
+    body_2 = [
+        f"Figure 2 — Enumerating founder-allele assignments at site {s1['label']} (clean pass)",
         "",
-        f"Site {s1['label']}:  "
-        f"Dad={_fmt_gt(obs1['Dad'])}  "
-        f"Mom={_fmt_gt(obs1['Mom'])}  "
-        f"Kid1={_fmt_gt(obs1['Kid1'])}  "
-        f"Kid2={_fmt_gt(obs1['Kid2'])}  "
-        f"Kid3={_fmt_gt(obs1['Kid3'])}",
+        "Inputs consumed at this site:",
         "",
-        "For each 2^F=4 orientation, assign_genotypes maps letter -> VCF",
-        "allele and propagates to the kids:",
+        "  (A) Observed VCF genotypes (unphased):",
+        f"      Dad  = {_fmt_gt(obs1['Dad'])}   Mom  = {_fmt_gt(obs1['Mom'])}",
+        f"      Kid1 = {_fmt_gt(obs1['Kid1'])}   "
+        f"Kid2 = {_fmt_gt(obs1['Kid2'])}   "
+        f"Kid3 = {_fmt_gt(obs1['Kid3'])}",
+        "      (each founder's two VCF alleles are UNPHASED: we do not know",
+        "       which one sits on the paternal vs the maternal homolog.)",
         "",
-        _cols(orient_cols_full, orient_widths_full),
-        _cols(["-" * (w - 1) for w in orient_widths_full], orient_widths_full),
+        "  (B) Block letter labels (constant inside the block, read from",
+        "      {prefix}.iht.txt):",
+        "      Dad  letters = A/B     Mom  letters = C/D     (UNPHASED letters)",
+        "      Kid1 letters = A|C     Kid2 letters = B|D     Kid3 letters = A|C",
+        "      (kids' letter pairs ARE phased: paternal letter | maternal letter.)",
+        "",
+        "Algorithm, per site:",
+        "  1. Try every way of assigning Dad's {0,1} to letters (A,B) and",
+        "     Mom's {0,1} to (C,D).  2^F = 4 assignments.",
+        "  2. Read each kid's phased letter pair (e.g. A|C) as a phased",
+        "     VCF genotype under the assignment.",
+        "  3. Unphase the expected kid genotype (sort its alleles).",
+        "  4. Compare with the observed unphased kid genotype.",
+        "  5. Report the number of kids whose expected unphased genotype",
+        "     differs from the observed genotype.",
+        "",
+        _cols(assign_cols, assign_widths),
+        _cols(["-" * (w - 1) for w in assign_widths], assign_widths),
     ]
     for dl, ml, exp, nmis in s1["orient_results"]:
         dad_pair = _sorted_unphased(obs1["Dad"])
         mom_pair = _sorted_unphased(obs1["Mom"])
-        orient = f"({dl[0]},{dl[1]}),({ml[0]},{ml[1]})"
-        map_str = (
-            f"{dl[0]}->{dad_pair[0]},{dl[1]}->{dad_pair[1]},"
-            f"{ml[0]}->{mom_pair[0]},{ml[1]}->{mom_pair[1]}"
+        assignment = (
+            f"{dl[0]}={dad_pair[0]},{dl[1]}={dad_pair[1]};"
+            f"{ml[0]}={mom_pair[0]},{ml[1]}={mom_pair[1]}"
         )
-        kids = (
+        phased = (
+            f"K1={_fmt_phased(exp['Kid1'])} "
+            f"K2={_fmt_phased(exp['Kid2'])} "
+            f"K3={_fmt_phased(exp['Kid3'])}"
+        )
+        unphased = (
             f"K1={_fmt_gt(exp['Kid1'])} "
             f"K2={_fmt_gt(exp['Kid2'])} "
             f"K3={_fmt_gt(exp['Kid3'])}"
         )
         star = "   <- winner" if nmis == 0 else ""
-        body_3.append(
-            _cols([orient, map_str, kids, str(nmis)], orient_widths_full, star)
+        body_2.append(
+            _cols(
+                [assignment, phased, unphased, str(nmis)],
+                assign_widths,
+                star,
+            )
         )
-
-    best_exp = s1["best"][2]
-    body_3 += [
-        "",
-        "Phased output under the winning orientation:",
-        f"Kid1 p|m:  {_fmt_phased(best_exp['Kid1'])}   (paternal=A, maternal=C)",
-        f"Kid2 p|m:  {_fmt_phased(best_exp['Kid2'])}   (paternal=B, maternal=D)",
-        f"Kid3 p|m:  {_fmt_phased(best_exp['Kid3'])}   (paternal=A, maternal=C)",
-    ]
-    _render_panel_image(body_3, c_dir / "fig3.png")
+    _render_panel_image(body_2, c_dir / "fig2.png")
 
     # ------------------------------------------------------------------
-    # Figure 4 — orientation search at the error site N2.
+    # Figure 3 — founder-allele-assignment search at error site N2.
     # ------------------------------------------------------------------
     s2 = per_site[1]
     obs2 = s2["observed"]
 
-    orient_cols_slim = ["orient", "expected kids", "#mis"]
-    orient_widths_slim = [13, 24, 5]
+    assign_cols_slim = ["assignment", "kids (unphased)", "#mis"]
+    assign_widths_slim = [20, 22, 5]
 
-    body_4 = [
-        f"Figure 4 — Four orientations at site {s2['label']} (injected error)",
+    body_3 = [
+        f"Figure 3 — No founder-allele assignment fits site {s2['label']} (injected error)",
         "",
         f"Site {s2['label']} (ERROR):  "
         f"Dad={_fmt_gt(obs2['Dad'])}  "
@@ -2772,36 +2759,41 @@ def component_3_concordance(out_dir: Path) -> None:
         f"Kid2={_fmt_gt(obs2['Kid2'])}  "
         f"Kid3={_fmt_gt(obs2['Kid3'])}",
         "",
-        _cols(orient_cols_slim, orient_widths_slim),
-        _cols(["-" * (w - 1) for w in orient_widths_slim], orient_widths_slim),
+        _cols(assign_cols_slim, assign_widths_slim),
+        _cols(["-" * (w - 1) for w in assign_widths_slim], assign_widths_slim),
     ]
     for dl, ml, exp, nmis in s2["orient_results"]:
-        orient = f"({dl[0]},{dl[1]}),({ml[0]},{ml[1]})"
+        dad_pair = _sorted_unphased(obs2["Dad"])
+        mom_pair = _sorted_unphased(obs2["Mom"])
+        assignment = (
+            f"{dl[0]}={dad_pair[0]},{dl[1]}={dad_pair[1]};"
+            f"{ml[0]}={mom_pair[0]},{ml[1]}={mom_pair[1]}"
+        )
         kids = (
             f"K1={_fmt_gt(exp['Kid1'])} "
             f"K2={_fmt_gt(exp['Kid2'])} "
             f"K3={_fmt_gt(exp['Kid3'])}"
         )
-        body_4.append(_cols([orient, kids, str(nmis)], orient_widths_slim))
+        body_3.append(_cols([assignment, kids, str(nmis)], assign_widths_slim))
     min_mis = min(r[3] for r in s2["orient_results"])
-    body_4 += [
+    body_3 += [
         "",
-        f"Minimum mismatch across all 4 orientations: {min_mis}",
+        f"Minimum mismatch across all 4 assignments: {min_mis}",
         "",
-        "No orientation yields 0 mismatches, so the site is written to",
+        "No assignment yields 0 mismatches, so the site is written to",
         "{prefix}.fail.vcf and the offending sample(s) are logged to",
         "{prefix}.failed_sites.txt. If exactly ONE sample is the culprit",
         "across the whole block, the failure is counted as a 'singleton',",
         "a strong signal of a sequencing error in that one sample.",
     ]
-    _render_panel_image(body_4, c_dir / "fig4.png")
+    _render_panel_image(body_3, c_dir / "fig3.png")
 
     # ------------------------------------------------------------------
-    # Figure 5 — truth vs deduced phased genotypes, paternal and
+    # Figure 4 — truth vs deduced phased genotypes, paternal and
     # maternal on separate rows per kid.
     # ------------------------------------------------------------------
-    body_5 = [
-        "Figure 5 — Truth vs deduced phased genotypes",
+    body_4 = [
+        "Figure 4 — Truth vs deduced phased genotypes",
         "",
         "Truth (T) vs deduced (D) phased genotypes at the two sites:",
         "",
@@ -2816,7 +2808,7 @@ def component_3_concordance(out_dir: Path) -> None:
             dedu = None
             status = "FAIL -> fail.vcf"
             all_pass = False
-        body_5.append(f"Site {s['label']}    [{status}]")
+        body_4.append(f"Site {s['label']}    [{status}]")
         for kid in ["Kid1", "Kid2", "Kid3"]:
             tp, tm = truth[kid]
             if dedu is None:
@@ -2825,9 +2817,9 @@ def component_3_concordance(out_dir: Path) -> None:
             else:
                 dp_str = str(dedu[kid][0])
                 dm_str = str(dedu[kid][1])
-            body_5.append(f"{kid} p   T: {tp}   D: {dp_str}")
-            body_5.append(f"{kid} m   T: {tm}   D: {dm_str}")
-        body_5.append("")
+            body_4.append(f"{kid} p   T: {tp}   D: {dp_str}")
+            body_4.append(f"{kid} m   T: {tm}   D: {dm_str}")
+        body_4.append("")
 
     total_slots = len(NON_INFORMATIVE_SITES) * 3 * 2
     pass_slots = sum(
@@ -2845,14 +2837,14 @@ def component_3_concordance(out_dir: Path) -> None:
                 mismatches += 1
             if tm != dm:
                 mismatches += 1
-    body_5.append(
+    body_4.append(
         f"At PASS sites: {mismatches} phased-allele mismatches out of "
         f"{pass_slots} slots."
     )
-    body_5.append(
+    body_4.append(
         "FAIL sites are NOT phased — they are written as-is to fail.vcf."
     )
-    _render_panel_image(body_5, c_dir / "fig5.png")
+    _render_panel_image(body_4, c_dir / "fig4.png")
 
     # ------------------------------------------------------------------
     # Markdown narrative.
@@ -2972,9 +2964,9 @@ allele.
 
 ## 2. Non-informative sites inside the block
 
-![Figure 2 — Non-informative sites inside the block](fig2.png)
+![Figure 1 — Non-informative sites inside the block](fig1.png)
 
-The two sites in Figure 2 are both homozygous-absent for informative
+The two sites in Figure 1 are both homozygous-absent for informative
 patterns: dad is `0/1` and so is mom. `gtg-ped-map`'s
 [`unique_allele`]({link(map_rs, 243)}) test therefore returns `None`
 at both sites, so neither contributes to block construction. They
@@ -2984,44 +2976,46 @@ phased `pass.vcf` record or a quarantined `fail.vcf` record.
 
 Site `N2` carries an **injected sequencing error**: Kid1 is reported
 as `1/1` even though the simulation truth is `0/1`. This is the case
-that the "impossible genotype" rule in Figure 4 is designed to catch.
+that the "impossible genotype" rule in Figure 3 is designed to catch.
 
-## 3. Orientation enumeration at a clean site
+## 3. Enumerating founder-allele assignments at a clean site
 
-![Figure 3 — Four orientations at site N1 (clean pass)](fig3.png)
+![Figure 2 — Enumerating founder-allele assignments at site N1 (clean pass)](fig2.png)
 
 At every record inside a block,
 [`find_best_phase_orientation`]({link(conc_rs, 252)}) (driver call at
 [`gtg_concordance.rs:454`]({link(conc_rs, 454)})) enumerates the
-`2^F=4` orientations produced by
+`2^F=4` founder-allele assignments produced by
 [`Iht::founder_phase_orientations`]({link(iht_rs, 492)}) (invoked
 inside `find_best_phase_orientation` at
-[`gtg_concordance.rs:256`]({link(conc_rs, 256)})). Each orientation is
-a choice of which of dad's two sorted VCF alleles is tagged `A` vs `B`
-and which of mom's two is tagged `C` vs `D`. Under a given
-orientation,
+[`gtg_concordance.rs:256`]({link(conc_rs, 256)})). Each assignment
+chooses which of dad's two sorted VCF alleles is tagged `A` vs `B`
+and which of mom's two is tagged `C` vs `D` — recall that the
+founders' letters are *unphased* (A/B, C/D), whereas each kid's
+letter pair is *phased* (paternal letter | maternal letter) by
+construction of the block. Under a given assignment,
 [`Iht::assign_genotypes`]({link(iht_rs, 442)}) (driver call at
 [`gtg_concordance.rs:487`]({link(conc_rs, 487)}) on the failing branch
 and [`gtg_concordance.rs:514`]({link(conc_rs, 514)}) on the passing
-branch) turns each kid's letter pair into an expected genotype. A
-straight equality check —
+branch) reads each kid's phased letter pair as a phased VCF genotype.
+That genotype is then unphased (alleles sorted) and compared against
+the observed unphased kid genotype by
 [`compare_genotype_maps`]({link(conc_rs, 213)}) (driver call at
-[`gtg_concordance.rs:268`]({link(conc_rs, 268)})) — counts how many
-samples disagree with the observation.
+[`gtg_concordance.rs:268`]({link(conc_rs, 268)})), which counts how
+many kids disagree.
 
-At site `N1`, exactly one of the four orientations explains every
-sample simultaneously; the three others each force a mismatch
-somewhere among the kids. The winning orientation fixes the
-letter→allele map at this site, and the block's letter labels
-immediately give the phased `p|m` genotypes shown beneath the
-orientation table.
+At site `N1`, exactly one of the four assignments explains every kid
+simultaneously; the three others each force a mismatch somewhere.
+The winning assignment fixes the letter→allele map at this site, and
+the kids' phased letter pairs immediately give the phased `p|m`
+genotypes shown in the "kids (phased)" column.
 
 ## 4. The "impossible genotype" rule
 
-![Figure 4 — Four orientations at site N2 (injected error)](fig4.png)
+![Figure 3 — No founder-allele assignment fits site N2 (injected error)](fig3.png)
 
-At site `N2` the injected error means **no** orientation produces zero
-mismatches — the best any orientation can do is {n2_min_mis} sample(s)
+At site `N2` the injected error means **no** assignment produces zero
+mismatches — the best any assignment can do is {n2_min_mis} sample(s)
 disagreeing. `find_best_phase_orientation` therefore returns a
 non-empty mismatch list, the driver writes the record to
 `{{prefix}}.fail.vcf` at
@@ -3041,13 +3035,13 @@ labels cannot justify.
 
 ## 5. Truth versus deduced phased genotypes
 
-![Figure 5 — Truth vs deduced phased genotypes](fig5.png)
+![Figure 4 — Truth vs deduced phased genotypes](fig4.png)
 
 At the PASS site (`N1`), every kid's deduced paternal and maternal
 phased alleles match the simulation truth exactly
 ({mismatches} mismatches out of {pass_slots} phased-allele slots). At
 the FAIL site (`N2`), no phased output is emitted — the record lands
-in `fail.vcf` untouched and the truth row in Figure 5 is shown only to
+in `fail.vcf` untouched and the truth row in Figure 4 is shown only to
 document what `gtg-concordance` declined to commit to.
 
 This closes the pipeline. `gtg-ped-map` (`map_builder.rs`) is a pure
