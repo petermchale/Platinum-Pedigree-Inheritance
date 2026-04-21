@@ -2731,13 +2731,6 @@ the counts come out:
 | Ancestral `A→B` | 1 (in G1-Dad) | 2 (GK1 m, GK2 m) |
 | De novo `B→C`   | 1 (in Kid3's G2→G3 meiosis) | 1 (GK1 m) |
 
-So `{{prefix}}.recombinants.txt` contains three rows for this
-pedigree even though only two distinct meioses actually recombined.
-Collapsing the shared ancestral rows into a count of *unique meiotic
-events* is the downstream reconciliation step
-[`methods.md §4.5`](../methods.md) describes; the implementation
-deliberately exposes the raw per-descendant transitions.
-
 ### Sanity check against truth
 
 ![Figure 5 — Truth vs deduced founder labels](fig5.png)
