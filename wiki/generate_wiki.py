@@ -2496,10 +2496,16 @@ become visible once a third generation is in the pedigree:
    of a G1→G2 pass. The *one* operation on the nuclear-family page
    that really is a walk over the pedigree —
    [`track_alleles_through_pedigree`]({link(map_rs, 295)}), which
-   performs Step-1 carrier tagging and Step-2 informative-site letter
-   assignment — is **a single ancestor-first walk** that considers
-   G1, G2 and G3 together, iterating over (parent, spouse, child)
-   triples in depth order. For this pedigree the walk visits two
+   performs [Step 1](../nuclear_family/nuclear_family.md#3-informative-site-detection-founder-letter-tagging-and-haplotype-inference-within-a-linkage-block)
+   (flag, per (parent, spouse, child) triple, the sites at which the
+   parent is heterozygous and the spouse is homozygous — the sites
+   where the parent's two alleles are distinguishable in the
+   children) and [Step 2](../nuclear_family/nuclear_family.md#3-informative-site-detection-founder-letter-tagging-and-haplotype-inference-within-a-linkage-block)
+   (at each such site, write one of the parent's two letters onto
+   whichever child-homolog carries the parent's unique allele) —
+   is **a single ancestor-first walk** that considers G1, G2 and G3
+   together, iterating over (parent, spouse, child) triples in depth
+   order. For this pedigree the walk visits two
    triples back-to-back, and by the time it reaches the second triple
    the G2 parent's letters have already been written into her slot
    pair — so they serve as "parent letters" for the G3 sub-problem
