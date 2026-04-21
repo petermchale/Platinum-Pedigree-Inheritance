@@ -2921,8 +2921,6 @@ markdown file itself.
 
 ## 1. Ingesting inheritance blocks and their variants
 
-![Figure 1 — Phasing variants in an inheritance block](fig1.png)
-
 The driver reads the `{{prefix}}.iht.txt` file produced by
 `gtg-ped-map` using
 [`parse_ihtv2_file`]({link(iht_rs, 606)}) (driver call at
@@ -2936,8 +2934,8 @@ the two letter labels separated by `|` or `/`. Using `founder_count`
 individuals is stored in the block's `founders` map and the rest in
 its `children` map, so every block ends up as an `IhtVec {{ bed,
 iht: Iht {{ founders, children }}, count }}` entry. Inside this block
-the letters are constant; for the left half of the nuclear-family
-chromosome they are the ones shown in Figure 1.
+the letters are constant; the concrete labels used by the toy
+simulation appear in the "Block letter labels" panel of Figure 2.
 
 The driver then iterates over the returned `Vec<IhtVec>` one block at
 a time. For each block it converts the BED coordinates to the
