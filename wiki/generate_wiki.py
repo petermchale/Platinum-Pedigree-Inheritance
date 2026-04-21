@@ -2481,7 +2481,7 @@ def _emit_component2_markdown(
     ped_rs = "code/rust/src/ped.rs"
 
     content = f"""\
-# Carrying the same walk into a third generation
+# Structural haplotype mapping across three generations
 
 This page is part of the [wiki](../index.md) and extends the
 [nuclear-family walkthrough](../nuclear_family/nuclear_family.md) by
