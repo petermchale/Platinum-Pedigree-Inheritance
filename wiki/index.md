@@ -3,7 +3,7 @@
 This wiki accompanies the `gtg-ped-map` and `gtg-concordance` Rust
 binaries in this repository. It is organised as a small catalog of
 self-contained pages that walk through the pipeline in increasing
-order of complexity, plus a full Methods write-up for the manuscript.
+order of complexity.
 
 The structure is inspired by Andrej Karpathy's "LLM Wiki" pattern —
 see his [tweet](https://x.com/karpathy/status/2040572272944324650) and
@@ -38,13 +38,6 @@ python wiki/generate_wiki.py
    alleles at the sites `gtg-ped-map` could not touch. Introduces the
    `2^F` founder-phase orientation search and the "impossible
    genotype" rule that routes sequencing errors to `fail.vcf`.
-
-## Reference pages
-
-- [Methods](methods.md) — the manuscript-style write-up with the
-  real-world caveats (depth filtering, phase instability, sibship
-  backfilling, chromosome X) that the walkthrough pages deliberately
-  skip.
 
 ## Conventions
 
