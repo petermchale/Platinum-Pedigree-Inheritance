@@ -3080,6 +3080,41 @@ Under the winning map, the kids' phased letter pairs immediately
 give the phased `p|m` genotypes shown in the
 "kids (expected, phased)" column.
 
+Those `p|m` genotypes are what the passing branch — entered at
+[`gtg_concordance.rs:509`]({link(conc_rs, 509)}) when the winning
+orientation leaves zero mismatches — actually writes to
+`{{prefix}}.pass.vcf`. The driver clones the original VCF record
+([`gtg_concordance.rs:510`]({link(conc_rs, 510)})) so that every
+non-GT field (`CHROM`, `POS`, `REF`/`ALT`, `QUAL`, `INFO`, other
+`FORMAT` columns) flows through unchanged, then re-runs
+`Iht::assign_genotypes` on the winner with `sort_alleles = false`
+([`gtg_concordance.rs:514`]({link(conc_rs, 514)})). That flag is the
+load-bearing difference from the orientation-search call at
+[`gtg_concordance.rs:267`]({link(conc_rs, 267)}): with sorting off,
+each sample's returned pair keeps the letter order declared in the
+block — `hap1 → paternal` first, `hap2 → maternal` second — which is
+exactly the phase that will be serialised. A per-sample loop
+([`gtg_concordance.rs:517`]({link(conc_rs, 517)})) then builds a flat
+`Vec<GenotypeAllele>` with two entries per sample: the paternal allele
+is pushed as-is, and the maternal allele is re-wrapped as
+`GenotypeAllele::Phased(i)`
+([`gtg_concordance.rs:524`]({link(conc_rs, 524)})). In `rust-htslib`'s
+encoding, the phase bit lives on the **second** allele of a diploid
+pair — marking it `Phased` is what turns the emitted genotype into
+`p|m` rather than `p/m`. Missing maternal alleles are pushed unchanged
+because a missing slot cannot be phased, and any sample that appears
+in the VCF without a counterpart in the block's `Iht` is written as
+`./.` so the column order stays aligned with the rest of the row. The
+completed vector is installed on the cloned record via
+`push_genotypes` ([`gtg_concordance.rs:533`]({link(conc_rs, 533)})),
+which overwrites only the `GT` field, and the record is written to
+`{{prefix}}.pass.vcf` at
+[`gtg_concordance.rs:534`]({link(conc_rs, 534)}). This is the only
+place in the pipeline where observed `0/1` pairs are turned into
+directed `p|m` output — no read-level haplotagging is consulted at
+this stage; phase is derived entirely from the block's structural
+letters plus the winning letter→allele map.
+
 ## 4. Failing to deduce variant phase by exhaustive enumeration at an error site
 
 ![Figure 3 — Failing to deduce variant phase by exhaustive enumeration at site N2 (injected error)](fig3.png)
