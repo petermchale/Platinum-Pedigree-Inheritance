@@ -3384,12 +3384,17 @@ Individual pages can be regenerated in isolation via
    still phaseable via the `2^F` founder-phase orientation search,
    which enumerates every letter→allele correspondence consistent
    with the block's structural labels and keeps the one that
-   minimises per-sample mismatches. A clean site exercises the
-   passing branch that rewrites the record as `p|m` and emits it to
+   minimises per-sample mismatches. `gtg-concordance`'s main loop
+   then splits on that mismatch count — the two **branches** (the
+   `if`/`else` arms of an `if mismatches_nonempty { ... } else { ...
+   }` check) are the "passing branch" for zero mismatches and the
+   "failing branch" for one or more. A clean site exercises the
+   passing branch, which rewrites the record as `p|m` and emits it to
    `{prefix}.pass.vcf`; a sister site with an injected sequencing
-   error exercises the failing branch, the per-block singleton tally
-   written to `{prefix}.filtering_stats.txt`, and the debug-level
-   per-record genotype dump that localises the offending sample. An
+   error exercises the failing branch, along with the per-block
+   singleton tally written to `{prefix}.filtering_stats.txt` and the
+   debug-level per-record genotype dump that localises the offending
+   sample. An
    appendix walks `Iht::assign_genotypes` — the pure function the
    orientation search calls once per orientation — line by line.
 
