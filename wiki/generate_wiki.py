@@ -2777,36 +2777,67 @@ def component_3_concordance(out_dir: Path) -> None:
     # ------------------------------------------------------------------
     s2 = per_site[1]
     obs2 = s2["observed"]
-
-    assign_cols_slim = ["assignment", "kids (unphased)", "#mis"]
-    assign_widths_slim = [20, 22, 5]
+    truth2 = s2["truth"]
 
     body_3 = [
         f"Figure 3 — Failing to deduce variant phase by exhaustive enumeration at site {s2['label']} (injected error)",
         "",
-        f"Site {s2['label']} (ERROR):  "
-        f"Dad={_fmt_gt(obs2['Dad'])}  "
-        f"Mom={_fmt_gt(obs2['Mom'])}  "
-        f"Kid1={_fmt_gt(obs2['Kid1'])} (err)  "
-        f"Kid2={_fmt_gt(obs2['Kid2'])}  "
-        f"Kid3={_fmt_gt(obs2['Kid3'])}",
+        "Inputs consumed at this site:",
         "",
-        _cols(assign_cols_slim, assign_widths_slim),
-        _cols(["-" * (w - 1) for w in assign_widths_slim], assign_widths_slim),
+        "  (A) Observed unphased alleles (read from VCF):",
+        f"      Dad  = {_fmt_gt(obs2['Dad'])}   Mom  = {_fmt_gt(obs2['Mom'])}",
+        f"      Kid1 = {_fmt_gt(obs2['Kid1'])} (err)   "
+        f"Kid2 = {_fmt_gt(obs2['Kid2'])}   "
+        f"Kid3 = {_fmt_gt(obs2['Kid3'])}",
+        f"      (Kid1's true unphased alleles are {_fmt_gt(truth2['Kid1'])}; the observed"
+        f" {_fmt_gt(obs2['Kid1'])} is a",
+        "       sequencing error injected for this walkthrough.)",
+        "",
+        "  (B) Block letter labels (constant inside the block, read from",
+        "      {prefix}.iht.txt):",
+        "      Dad  letters = A/B     Mom  letters = C/D     (UNPHASED letters)",
+        "      Kid1 letters = A|C     Kid2 letters = B|D     Kid3 letters = A|C",
+        "      (kids' letter pairs ARE phased: paternal letter | maternal letter.)",
+        "",
+        _cols(assign_cols, assign_widths),
+        _cols(["-" * (w - 1) for w in assign_widths], assign_widths),
     ]
+    observed_unphased_2 = (
+        f"K1={_fmt_gt(obs2['Kid1'])} "
+        f"K2={_fmt_gt(obs2['Kid2'])} "
+        f"K3={_fmt_gt(obs2['Kid3'])}"
+    )
+    rows_3 = []
     for dl, ml, exp, nmis in s2["orient_results"]:
         dad_pair = _sorted_unphased(obs2["Dad"])
         mom_pair = _sorted_unphased(obs2["Mom"])
-        assignment = (
-            f"{dl[0]}={dad_pair[0]},{dl[1]}={dad_pair[1]};"
-            f"{ml[0]}={mom_pair[0]},{ml[1]}={mom_pair[1]}"
+        letter_to_allele = {
+            dl[0]: dad_pair[0],
+            dl[1]: dad_pair[1],
+            ml[0]: mom_pair[0],
+            ml[1]: mom_pair[1],
+        }
+        a_A, a_B, a_C, a_D = (letter_to_allele[L] for L in "ABCD")
+        assignment = f"A={a_A},B={a_B};C={a_C},D={a_D}"
+        phased = (
+            f"K1={_fmt_phased(exp['Kid1'])} "
+            f"K2={_fmt_phased(exp['Kid2'])} "
+            f"K3={_fmt_phased(exp['Kid3'])}"
         )
-        kids = (
+        expected_unphased = (
             f"K1={_fmt_gt(exp['Kid1'])} "
             f"K2={_fmt_gt(exp['Kid2'])} "
             f"K3={_fmt_gt(exp['Kid3'])}"
         )
-        body_3.append(_cols([assignment, kids, str(nmis)], assign_widths_slim))
+        rows_3.append(((a_A, a_B, a_C, a_D), assignment, phased, expected_unphased, nmis))
+    rows_3.sort(key=lambda r: r[0])
+    for _, assignment, phased, expected_unphased, nmis in rows_3:
+        body_3.append(
+            _cols(
+                [assignment, phased, expected_unphased, observed_unphased_2, str(nmis)],
+                assign_widths,
+            )
+        )
     min_mis = min(r[3] for r in s2["orient_results"])
     body_3 += [
         "",
@@ -3144,7 +3175,7 @@ block's row of `{{prefix}}.filtering_stats.txt` at
 [`gtg_concordance.rs:559`]({link(conc_rs, 559)}), giving a breakdown
 of who is singly responsible for concordance failures in each block.
 
-On the same singleton branch, the driver also emits a per-record
+On the fail branch, the driver also emits a per-record
 diagnostic dump at `debug!` level
 ([`gtg_concordance.rs:489`]({link(conc_rs, 489)})). When `gtg-concordance`
 is run with debug logging enabled (e.g. `RUST_LOG=debug`), each
