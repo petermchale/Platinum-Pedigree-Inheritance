@@ -3014,35 +3014,50 @@ Figure 3 covers, where exhaustive enumeration finds no consistent phase.
 
 At every record inside a block,
 [`find_best_phase_orientation`]({link(conc_rs, 252)}) (driver call at
-[`gtg_concordance.rs:454`]({link(conc_rs, 454)})) enumerates the
-`2^F=4` letter-allele mappings produced by
-[`Iht::founder_phase_orientations`]({link(iht_rs, 492)}) (invoked
-inside `find_best_phase_orientation` at
-[`gtg_concordance.rs:256`]({link(conc_rs, 256)})). Each mapping
-chooses which of dad's two sorted VCF alleles is tagged `A` vs `B`
-and which of mom's two is tagged `C` vs `D` — recall that the
-founders' letters are *unphased* (A/B, C/D), whereas each kid's
-letter pair is *phased* (paternal letter | maternal letter) by
-construction of the block. Only 4 of the `2^4 = 16` conceivable
-letter-allele tuples are actually reachable: each founder's VCF
-genotype at this site is `0/1`, containing exactly one `0` and one
-`1`, and those two values are what the founder's two letters split
-between them — so `A` and `B` can't both be `0` (nor both `1`), and
-likewise for `C` and `D`. The surviving `2^F = 4` mappings are the
-2 orderings per founder. Under a given mapping,
-[`Iht::assign_genotypes`]({link(iht_rs, 442)}) (driver call at
-[`gtg_concordance.rs:487`]({link(conc_rs, 487)}) on the failing branch
-and [`gtg_concordance.rs:514`]({link(conc_rs, 514)}) on the passing
-branch) reads each kid's phased letter pair as a phased VCF genotype.
-That genotype is then unphased (alleles sorted) and compared against
-the observed unphased kid genotype by
-[`compare_genotype_maps`]({link(conc_rs, 213)}) (driver call at
-[`gtg_concordance.rs:268`]({link(conc_rs, 268)})), which counts how
-many kids disagree.
+[`gtg_concordance.rs:454`]({link(conc_rs, 454)})) drives a two-step
+per-site search: first enumerate letter orderings in letter-space
+only, then pair each ordering against the site's sorted VCF alleles
+to yield a candidate letter→allele mapping. Recall that the founders'
+letters are *unphased* (A/B, C/D), whereas each kid's letter pair is
+*phased* (paternal letter | maternal letter) by construction of the
+block.
 
-At site `N1`, exactly one of the four mappings explains every kid
+1. **Letter orderings.**
+   [`Iht::founder_phase_orientations`]({link(iht_rs, 492)}) (invoked
+   inside `find_best_phase_orientation` at
+   [`gtg_concordance.rs:256`]({link(conc_rs, 256)})) emits every
+   reordering of each founder's two-letter tuple. With `F = 2`
+   founders that is `2^F = 4` orderings: dad's letters are either
+   `(A, B)` or `(B, A)`, mom's are either `(C, D)` or `(D, C)`. No
+   VCF alleles are consulted at this step — the orderings are pure
+   letter permutations, cloned from the block's `iht.txt` entry, and
+   the kids' phased letter pairs ride along unchanged.
+
+2. **Letter→allele mapping.**
+   [`Iht::assign_genotypes`]({link(iht_rs, 442)}) (driver call at
+   [`gtg_concordance.rs:487`]({link(conc_rs, 487)}) on the failing
+   branch and [`gtg_concordance.rs:514`]({link(conc_rs, 514)}) on the
+   passing branch) pairs each oriented founder tuple positionally
+   against the site's sorted VCF alleles. Dad's `(A, B)` against
+   sorted `(0, 1)` yields `A=0, B=1`; `(B, A)` yields `B=0, A=1` (and
+   likewise for mom). Under the resulting letter→allele map, each
+   kid's phased letter pair is read as a phased VCF genotype,
+   unphased by sorting, and compared against the observed unphased
+   kid genotype by
+   [`compare_genotype_maps`]({link(conc_rs, 213)}) (driver call at
+   [`gtg_concordance.rs:268`]({link(conc_rs, 268)})), which counts
+   how many kids disagree.
+
+Only 4 of the `2^4 = 16` conceivable letter→allele maps are reachable
+at this site: each founder's VCF genotype is `0/1`, containing
+exactly one `0` and one `1`, and those two values are what the
+founder's two letters split between them — so `A` and `B` can't both
+be `0` (nor both `1`), and likewise for `C` and `D`. The surviving
+maps are exactly the `2^F = 4` orderings above.
+
+At site `N1`, exactly one of the four maps explains every kid
 simultaneously; the three others each force a mismatch somewhere.
-Under the winning mapping, the kids' phased letter pairs immediately
+Under the winning map, the kids' phased letter pairs immediately
 give the phased `p|m` genotypes shown in the
 "kids (expected, phased)" column.
 

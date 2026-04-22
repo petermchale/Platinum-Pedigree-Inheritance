@@ -6,16 +6,16 @@ off. `gtg-ped-map` emits only founder letters, and only at informative
 sites; it never reconstructs the 0/1 allele sequence of any haplotype.
 That job belongs to `gtg-concordance`, which re-reads the VCF for each
 IHT block and phases **every** variant using the block's letter map.
-All line numbers refer to commit `ed43356`. As in the other
+All line numbers refer to commit `b2bb66a`. As in the other
 walkthrough pages, each function link is followed by its call site in
 the driver — `main()` in
-[`gtg_concordance.rs`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/gtg_concordance.rs#L315) — so you can step through
+[`gtg_concordance.rs`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/gtg_concordance.rs#L315) — so you can step through
 the driver source in parallel with this walkthrough.
 
 The toy simulation reuses the [left half of the nuclear-family block](https://github.com/petermchale/Platinum-Pedigree-Inheritance/blob/main/wiki/nuclear_family/fig4_2.png)
 (Kid1=(A,C), Kid2=(B,D), Kid3=(A,C)) and adds two sites where both
 parents are heterozygous. These are NON-informative for `gtg-ped-map`
-because [`unique_allele`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/map_builder.rs#L243) returns `None` at each
+because [`unique_allele`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/map_builder.rs#L243) returns `None` at each
 of them, but `gtg-concordance` still has to phase them. One of the two
 sites carries an injected sequencing error so both the clean-pass
 (`pass.vcf`) and error-quarantine (`fail.vcf`) code paths are
@@ -32,8 +32,8 @@ markdown file itself.
 
 The driver reads the `{prefix}.iht.txt` file produced by
 `gtg-ped-map` using
-[`parse_ihtv2_file`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/iht.rs#L606) (driver call at
-[`gtg_concordance.rs:405`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/gtg_concordance.rs#L405)). The parser walks
+[`parse_ihtv2_file`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/iht.rs#L606) (driver call at
+[`gtg_concordance.rs:405`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/gtg_concordance.rs#L405)). The parser walks
 the file line by line: the first three whitespace-separated fields of
 each row are the `chrom`, `start`, and `end` of the block's BED
 interval, the trailing columns carry the per-block marker count, and
@@ -50,22 +50,22 @@ The driver then iterates over the returned `Vec<IhtVec>` one block at
 a time. For each block it converts the BED coordinates to the
 `(chrom_id, start, end)` triple expected by `rust-htslib` and calls
 `reader.fetch(...)` at
-[`gtg_concordance.rs:427`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/gtg_concordance.rs#L427) to position the VCF
+[`gtg_concordance.rs:427`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/gtg_concordance.rs#L427) to position the VCF
 reader on the first record that falls inside the block — silently
 skipping the block if the fetch fails (e.g. the contig is absent from
 the VCF index). Every record returned by the resulting
 `reader.records()` iterator is fed through
-[`parse_vcf_record`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/gtg_concordance.rs#L116) at
-[`gtg_concordance.rs:440`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/gtg_concordance.rs#L440), which pulls each
+[`parse_vcf_record`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/gtg_concordance.rs#L116) at
+[`gtg_concordance.rs:440`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/gtg_concordance.rs#L440), which pulls each
 sample's depth and (unphased, index-sorted) allele vector into a
 `HashMap<String, (depth, Vec<GenotypeAllele>)>`. Low-quality records
 (`record.qual() < args.qual`) and records with missing alleles are
 short-circuited straight to `{prefix}.fail.vcf` at
-[`gtg_concordance.rs:444`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/gtg_concordance.rs#L444) and
-[`gtg_concordance.rs:450`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/gtg_concordance.rs#L450); everything else is
+[`gtg_concordance.rs:444`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/gtg_concordance.rs#L444) and
+[`gtg_concordance.rs:450`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/gtg_concordance.rs#L450); everything else is
 handed to the per-site phasing step —
-[`find_best_phase_orientation`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/gtg_concordance.rs#L252) at
-[`gtg_concordance.rs:454`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/gtg_concordance.rs#L454) — including variants
+[`find_best_phase_orientation`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/gtg_concordance.rs#L252) at
+[`gtg_concordance.rs:454`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/gtg_concordance.rs#L454) — including variants
 that `gtg-ped-map` could not use because neither parent has a unique
 allele.
 
@@ -75,7 +75,7 @@ allele.
 
 The two sites in Figure 1 are both homozygous-absent for informative
 patterns: dad is `0/1` and so is mom. `gtg-ped-map`'s
-[`unique_allele`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/map_builder.rs#L243) test therefore returns `None`
+[`unique_allele`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/map_builder.rs#L243) test therefore returns `None`
 at both sites, so neither contributes to block construction. They
 still enter `gtg-concordance`'s phasing loop; the per-site machinery
 described below is what turns their unphased genotypes into either a
@@ -90,36 +90,51 @@ Figure 3 covers, where exhaustive enumeration finds no consistent phase.
 ![Figure 2 — Deducing variant phase by exhaustive enumeration at site N1 (clean pass)](fig2.png)
 
 At every record inside a block,
-[`find_best_phase_orientation`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/gtg_concordance.rs#L252) (driver call at
-[`gtg_concordance.rs:454`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/gtg_concordance.rs#L454)) enumerates the
-`2^F=4` letter-allele mappings produced by
-[`Iht::founder_phase_orientations`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/iht.rs#L492) (invoked
-inside `find_best_phase_orientation` at
-[`gtg_concordance.rs:256`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/gtg_concordance.rs#L256)). Each mapping
-chooses which of dad's two sorted VCF alleles is tagged `A` vs `B`
-and which of mom's two is tagged `C` vs `D` — recall that the
-founders' letters are *unphased* (A/B, C/D), whereas each kid's
-letter pair is *phased* (paternal letter | maternal letter) by
-construction of the block. Only 4 of the `2^4 = 16` conceivable
-letter-allele tuples are actually reachable: each founder's VCF
-genotype at this site is `0/1`, containing exactly one `0` and one
-`1`, and those two values are what the founder's two letters split
-between them — so `A` and `B` can't both be `0` (nor both `1`), and
-likewise for `C` and `D`. The surviving `2^F = 4` mappings are the
-2 orderings per founder. Under a given mapping,
-[`Iht::assign_genotypes`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/iht.rs#L442) (driver call at
-[`gtg_concordance.rs:487`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/gtg_concordance.rs#L487) on the failing branch
-and [`gtg_concordance.rs:514`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/gtg_concordance.rs#L514) on the passing
-branch) reads each kid's phased letter pair as a phased VCF genotype.
-That genotype is then unphased (alleles sorted) and compared against
-the observed unphased kid genotype by
-[`compare_genotype_maps`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/gtg_concordance.rs#L213) (driver call at
-[`gtg_concordance.rs:268`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/gtg_concordance.rs#L268)), which counts how
-many kids disagree.
+[`find_best_phase_orientation`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/gtg_concordance.rs#L252) (driver call at
+[`gtg_concordance.rs:454`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/gtg_concordance.rs#L454)) drives a two-step
+per-site search: first enumerate letter orderings in letter-space
+only, then pair each ordering against the site's sorted VCF alleles
+to yield a candidate letter→allele mapping. Recall that the founders'
+letters are *unphased* (A/B, C/D), whereas each kid's letter pair is
+*phased* (paternal letter | maternal letter) by construction of the
+block.
 
-At site `N1`, exactly one of the four mappings explains every kid
+1. **Letter orderings.**
+   [`Iht::founder_phase_orientations`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/iht.rs#L492) (invoked
+   inside `find_best_phase_orientation` at
+   [`gtg_concordance.rs:256`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/gtg_concordance.rs#L256)) emits every
+   reordering of each founder's two-letter tuple. With `F = 2`
+   founders that is `2^F = 4` orderings: dad's letters are either
+   `(A, B)` or `(B, A)`, mom's are either `(C, D)` or `(D, C)`. No
+   VCF alleles are consulted at this step — the orderings are pure
+   letter permutations, cloned from the block's `iht.txt` entry, and
+   the kids' phased letter pairs ride along unchanged.
+
+2. **Letter→allele mapping.**
+   [`Iht::assign_genotypes`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/iht.rs#L442) (driver call at
+   [`gtg_concordance.rs:487`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/gtg_concordance.rs#L487) on the failing
+   branch and [`gtg_concordance.rs:514`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/gtg_concordance.rs#L514) on the
+   passing branch) pairs each oriented founder tuple positionally
+   against the site's sorted VCF alleles. Dad's `(A, B)` against
+   sorted `(0, 1)` yields `A=0, B=1`; `(B, A)` yields `B=0, A=1` (and
+   likewise for mom). Under the resulting letter→allele map, each
+   kid's phased letter pair is read as a phased VCF genotype,
+   unphased by sorting, and compared against the observed unphased
+   kid genotype by
+   [`compare_genotype_maps`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/gtg_concordance.rs#L213) (driver call at
+   [`gtg_concordance.rs:268`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/gtg_concordance.rs#L268)), which counts
+   how many kids disagree.
+
+Only 4 of the `2^4 = 16` conceivable letter→allele maps are reachable
+at this site: each founder's VCF genotype is `0/1`, containing
+exactly one `0` and one `1`, and those two values are what the
+founder's two letters split between them — so `A` and `B` can't both
+be `0` (nor both `1`), and likewise for `C` and `D`. The surviving
+maps are exactly the `2^F = 4` orderings above.
+
+At site `N1`, exactly one of the four maps explains every kid
 simultaneously; the three others each force a mismatch somewhere.
-Under the winning mapping, the kids' phased letter pairs immediately
+Under the winning map, the kids' phased letter pairs immediately
 give the phased `p|m` genotypes shown in the
 "kids (expected, phased)" column.
 
@@ -132,10 +147,10 @@ mismatches — the best any mapping can do is 1 sample(s)
 disagreeing. `find_best_phase_orientation` therefore returns a
 non-empty mismatch list, the driver writes the record to
 `{prefix}.fail.vcf` at
-[`gtg_concordance.rs:507`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/gtg_concordance.rs#L507) (alongside the
+[`gtg_concordance.rs:507`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/gtg_concordance.rs#L507) (alongside the
 low-quality and no-call records that were already routed to fail at
-[`gtg_concordance.rs:444`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/gtg_concordance.rs#L444) and
-[`gtg_concordance.rs:450`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/gtg_concordance.rs#L450)), and the offending
+[`gtg_concordance.rs:444`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/gtg_concordance.rs#L444) and
+[`gtg_concordance.rs:450`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/gtg_concordance.rs#L450)), and the offending
 sample names are appended to `{prefix}.failed_sites.txt`. If
 exactly one sample is the culprit across the whole block, the failure
 is counted as a "singleton" — a strong signal of a sequencing error
@@ -163,9 +178,9 @@ writes founder letters per individual per block.
 `gtg-concordance` (`gtg_concordance.rs`) is a pure phasing/QC tool
 that uses those structural labels to assign alleles at every site in
 the block: the passing records are phased via
-[`Iht::assign_genotypes`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/iht.rs#L442) and emitted to
+[`Iht::assign_genotypes`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/iht.rs#L442) and emitted to
 `{prefix}.pass.vcf` at
-[`gtg_concordance.rs:534`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/ed43356b10535c4f3f0d7f31d15319f64149c942/code/rust/src/bin/gtg_concordance.rs#L534), and the failing
+[`gtg_concordance.rs:534`](https://github.com/Platinum-Pedigree-Consortium/Platinum-Pedigree-Inheritance/blob/b2bb66a48ec3cede229bc02c47a2f28d0ddfa442/code/rust/src/bin/gtg_concordance.rs#L534), and the failing
 records are quarantined to `{prefix}.fail.vcf` as described above.
 The split is the answer to "does `gtg-ped-map` reconstruct the 0/1
 allele sequence of each haplotype?": no, and deliberately — that is
