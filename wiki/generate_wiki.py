@@ -3033,20 +3033,33 @@ block.
    letter permutations, cloned from the block's `iht.txt` entry, and
    the kids' phased letter pairs ride along unchanged.
 
-2. **Letter→allele mapping.**
-   [`Iht::assign_genotypes`]({link(iht_rs, 442)}) (driver call at
-   [`gtg_concordance.rs:487`]({link(conc_rs, 487)}) on the failing
-   branch and [`gtg_concordance.rs:514`]({link(conc_rs, 514)}) on the
-   passing branch) pairs each oriented founder tuple positionally
-   against the site's sorted VCF alleles. Dad's `(A, B)` against
-   sorted `(0, 1)` yields `A=0, B=1`; `(B, A)` yields `B=0, A=1` (and
-   likewise for mom). Under the resulting letter→allele map, each
-   kid's phased letter pair is read as a phased VCF genotype,
-   unphased by sorting, and compared against the observed unphased
-   kid genotype by
+2. **Letter→allele mapping.** Inside the per-orientation loop,
+   `find_best_phase_orientation` hands each oriented `phase` to
+   [`Iht::assign_genotypes`]({link(iht_rs, 442)}) at
+   [`gtg_concordance.rs:267`]({link(conc_rs, 267)}). That call pairs
+   the oriented founder tuple positionally against the site's sorted
+   VCF alleles: dad's `(A, B)` against sorted `(0, 1)` yields
+   `A=0, B=1`, while `(B, A)` yields `B=0, A=1` (likewise for mom).
+   Under the resulting letter→allele map, each kid's phased letter
+   pair becomes a phased VCF genotype, which is unphased by sorting
+   and compared against the observed unphased kid genotype by
    [`compare_genotype_maps`]({link(conc_rs, 213)}) (driver call at
-   [`gtg_concordance.rs:268`]({link(conc_rs, 268)})), which counts
-   how many kids disagree.
+   [`gtg_concordance.rs:268`]({link(conc_rs, 268)})). The
+   per-orientation mismatch count drives the search, and the
+   orientation with the lowest count is kept as the winner.
+
+`find_best_phase_orientation` returns only the winning *orientation*
+(an `Iht` clone with the reoriented founder tuple), not the
+letter→allele map or the expected kid genotypes — those are
+discarded as the loop moves on. So `main()` re-applies
+`assign_genotypes` to that single winner after the search returns:
+at [`gtg_concordance.rs:514`]({link(conc_rs, 514)}) on the passing
+branch, to turn the kids' phased letter pairs into phased VCF
+alleles that get written to `{{prefix}}.pass.vcf`, and at
+[`gtg_concordance.rs:487`]({link(conc_rs, 487)}) on the failing
+branch, to reconstruct the expected genotypes for the debug log.
+Running `assign_genotypes` twice on the winner is cheaper than
+threading the expected genotypes through the search's return value.
 
 Only 4 of the `2^4 = 16` conceivable letter→allele maps are reachable
 at this site: each founder's VCF genotype is `0/1`, containing
