@@ -3109,6 +3109,25 @@ block's row of `{{prefix}}.filtering_stats.txt` at
 [`gtg_concordance.rs:559`]({link(conc_rs, 559)}), giving a breakdown
 of who is singly responsible for concordance failures in each block.
 
+On the same singleton branch, the driver also emits a per-record
+diagnostic dump at `debug!` level
+([`gtg_concordance.rs:489`]({link(conc_rs, 489)})). When `gtg-concordance`
+is run with debug logging enabled (e.g. `RUST_LOG=debug`), each
+singleton failure produces a side-by-side table built by
+[`format_genotype_maps`]({link(conc_rs, 151)}) with one row per sample
+and columns `Sample | Seen | Expected | Mismatch | Inheritance`:
+`Seen` is the observed unphased genotype from the VCF, `Expected` is
+what the winning orientation predicts via
+[`Iht::assign_genotypes`]({link(iht_rs, 442)}), `Mismatch` is `YES`/`NO`
+from `genotypes_match`, and `Inheritance` is the two founder letters
+assigned to that sample in the winning `Iht`. The table is followed by
+a position line — `{{chrom}}:{{block_start}}-{{block_end}} {{variant_pos}}
+{{n_issues}} {{offending_sample}}` — pinpointing the block, the
+variant, and the single sample responsible. The dump is silent at the
+default log level and costs nothing in normal runs; it exists to let
+the user open the log and read off exactly why one sample's genotype
+contradicted the block's structural labels at a given site.
+
 This is the mechanism by which `gtg-concordance` filters sequencing
 errors, Mendelian violations, and residual block-labelling mistakes
 without ever producing a phased call that the block's structural
