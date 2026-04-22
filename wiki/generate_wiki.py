@@ -3078,7 +3078,7 @@ At site `N1`, exactly one of the four maps explains every kid
 simultaneously; the three others each force a mismatch somewhere.
 Under the winning map, the kids' phased letter pairs immediately
 give the phased `p|m` genotypes shown in the
-"kids (expected, phased)" column.
+"kids (expected, phased)" column of Figure 2.
 
 Those `p|m` genotypes are what the passing branch — entered at
 [`gtg_concordance.rs:509`]({link(conc_rs, 509)}) when the winning
