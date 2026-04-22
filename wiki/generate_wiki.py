@@ -3305,11 +3305,13 @@ def emit_wiki_index(out_path: Path) -> None:
 
 This wiki accompanies the `gtg-ped-map` (`map_builder.rs`) and
 `gtg-concordance` (`gtg_concordance.rs`) Rust binaries in this
-repository. Together they consume a PED file plus a jointly-called
-VCF and produce a per-block founder-letter map (`{prefix}.iht.txt`)
-alongside two output VCFs: a phased `{prefix}.pass.vcf` for records
-the block labels fully explain, and an unphased `{prefix}.fail.vcf`
-for records they cannot. The three walkthrough pages below isolate the ideas that make
+repository. They run sequentially: `gtg-ped-map` is invoked first on
+a PED file plus a jointly-called VCF and emits a per-block
+founder-letter map (`{prefix}.iht.txt`); `gtg-concordance` is then
+invoked on that map together with the same VCF, and emits two output
+VCFs — a phased `{prefix}.pass.vcf` for records the block labels
+fully explain, and an unphased `{prefix}.fail.vcf` for records they
+cannot. The three walkthrough pages below isolate the ideas that make
 that pipeline work, on toy pedigrees small enough that every
 intermediate table can be read off by hand.
 
