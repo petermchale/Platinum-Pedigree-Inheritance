@@ -3044,9 +3044,20 @@ block.
    pair becomes a phased VCF genotype, which is unphased by sorting
    and compared against the observed unphased kid genotype by
    [`compare_genotype_maps`]({link(conc_rs, 213)}) (driver call at
-   [`gtg_concordance.rs:268`]({link(conc_rs, 268)})). The
-   per-orientation mismatch count drives the search, and the
-   orientation with the lowest count is kept as the winner.
+   [`gtg_concordance.rs:268`]({link(conc_rs, 268)})). In short,
+   `assign_genotypes` is a pure two-pass function of its
+   `(orientation, observed alleles)` inputs: it first builds the
+   letter→allele map by zipping each founder's oriented letter
+   tuple positionally against their sorted VCF alleles, then
+   resolves every sample's two letters through that map — founders
+   round-trip to their observed alleles, kids land on their
+   expected phased genotype (and the two alleles are sorted so the
+   result is directly comparable to the unphased observed
+   genotype). The per-orientation mismatch count
+   ([`gtg_concordance.rs:269`]({link(conc_rs, 269)})) drives the
+   search, and the orientation with the lowest count is kept as
+   the winner
+   ([`gtg_concordance.rs:297`]({link(conc_rs, 297)})).
 
 `find_best_phase_orientation` returns only the winning *orientation*
 (an `Iht` clone with the reoriented founder tuple), not the
