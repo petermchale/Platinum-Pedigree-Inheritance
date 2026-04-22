@@ -3093,10 +3093,21 @@ non-empty mismatch list, the driver writes the record to
 low-quality and no-call records that were already routed to fail at
 [`gtg_concordance.rs:444`]({link(conc_rs, 444)}) and
 [`gtg_concordance.rs:450`]({link(conc_rs, 450)})), and the offending
-sample names are appended to `{{prefix}}.failed_sites.txt`. If
-exactly one sample is the culprit across the whole block, the failure
-is counted as a "singleton" — a strong signal of a sequencing error
-in that one sample rather than a systemic block-labelling problem.
+sample names are appended to `{{prefix}}.failed_sites.txt`. When the
+mismatch list returned by `find_best_phase_orientation` contains
+exactly one sample, the driver bumps that sample's tally in a
+per-block `failed_singletons: HashMap<String, i32>` accumulator
+(declared at
+[`gtg_concordance.rs:415`]({link(conc_rs, 415)}), incremented at
+[`gtg_concordance.rs:476`]({link(conc_rs, 476)})). These "singleton"
+failures are a strong signal of a sequencing error in that one sample
+rather than a systemic block-labelling problem: a block-wide labelling
+mistake would typically flag many samples at once, whereas random
+sequencing noise concentrates on a single individual. The per-sample
+counts are serialised as `sample:count;sample:count;...` into each
+block's row of `{{prefix}}.filtering_stats.txt` at
+[`gtg_concordance.rs:559`]({link(conc_rs, 559)}), giving a breakdown
+of who is singly responsible for concordance failures in each block.
 
 This is the mechanism by which `gtg-concordance` filters sequencing
 errors, Mendelian violations, and residual block-labelling mistakes
