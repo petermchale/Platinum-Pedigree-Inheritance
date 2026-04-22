@@ -71,7 +71,11 @@ Individual pages can be regenerated in isolation via
    informative sites and never reconstructs the 0/1 allele sequence
    of any haplotype; that job belongs to `gtg-concordance`, which
    re-reads the VCF for every IHT block and phases **every** variant
-   using the block's letter map. The walkthrough covers how
+   using the block's **letter map** — the pair of founder letters
+   each individual carries inside that block, as recorded in
+   `{prefix}.iht.txt` (e.g. `A|C` for a child who inherits the `A`
+   homolog paternally and the `C` homolog maternally). The
+   walkthrough covers how
    non-informative sites inside a block — sites where both parents
    are heterozygous and `gtg-ped-map` declined to touch them — are
    still phaseable via the `2^F` founder-phase orientation search,
