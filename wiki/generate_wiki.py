@@ -3044,20 +3044,15 @@ block.
    pair becomes a phased VCF genotype, which is unphased by sorting
    and compared against the observed unphased kid genotype by
    [`compare_genotype_maps`]({link(conc_rs, 213)}) (driver call at
-   [`gtg_concordance.rs:268`]({link(conc_rs, 268)})). In short,
-   `assign_genotypes` is a pure two-pass function of its
-   `(orientation, observed alleles)` inputs: it first builds the
-   letter→allele map by zipping each founder's oriented letter
-   tuple positionally against their sorted VCF alleles, then
-   resolves every sample's two letters through that map — founders
-   round-trip to their observed alleles, kids land on their
-   expected phased genotype (and the two alleles are sorted so the
-   result is directly comparable to the unphased observed
-   genotype). The per-orientation mismatch count
+   [`gtg_concordance.rs:268`]({link(conc_rs, 268)})). The
+   per-orientation mismatch count
    ([`gtg_concordance.rs:269`]({link(conc_rs, 269)})) drives the
    search, and the orientation with the lowest count is kept as
    the winner
    ([`gtg_concordance.rs:297`]({link(conc_rs, 297)})).
+
+   See the [appendix](#appendix-assign_genotypes-walkthrough)
+   for a step-by-step walkthrough of `assign_genotypes`.
 
 `find_best_phase_orientation` returns only the winning *orientation*
 (an `Iht` clone with the reoriented founder tuple), not the
@@ -3132,6 +3127,151 @@ records are quarantined to `{{prefix}}.fail.vcf` as described above.
 The split is the answer to "does `gtg-ped-map` reconstruct the 0/1
 allele sequence of each haplotype?": no, and deliberately — that is
 handled exclusively by `gtg-concordance`.
+
+## Appendix: `assign_genotypes` walkthrough
+
+A closer look at [`Iht::assign_genotypes`]({link(iht_rs, 442)}), the
+pure function the orientation search calls once per orientation at
+every site.
+
+### Signature
+
+```rust
+pub fn assign_genotypes(
+    &self,
+    founder_genotypes: &HashMap<String, Vec<GenotypeAllele>>,
+    sort_alleles: bool,
+) -> (HashMap<char, GenotypeAllele>,
+      HashMap<String, Vec<GenotypeAllele>>)
+```
+
+- `&self` — an [`Iht`]({link(iht_rs, 133)}) with
+  `founders: HashMap<String, (char, char)>` and `children:
+  HashMap<String, (char, char)>`. Each individual maps to the two
+  inherited **letters** (e.g. dad → `('A','B')`, mom → `('C','D')`,
+  a kid → `('A','C')`).
+- `founder_genotypes` — the VCF alleles observed at this site, keyed
+  by sample ID. Despite the name, the caller in
+  `find_best_phase_orientation` passes the *full* converted
+  genotype map (founders **and** kids); only the founder entries
+  are read in step 1.
+- `sort_alleles` — when `true`, the returned two-allele vectors are
+  sorted low→high (i.e. unphased form). The concordance caller
+  passes `true` at [`gtg_concordance.rs:267`]({link(conc_rs, 267)})
+  so the output can be compared against unphased observed genotypes.
+- **Returns** a pair: the letter→allele map (what each `char`
+  resolved to), and every sample's two-allele vector under that
+  map.
+
+### Step 1 — build the letter→allele map
+
+[`iht.rs:453-461`]({link(iht_rs, 453)}):
+
+```rust
+for (founder, (allele1, allele2)) in &self.founders {{
+    if let Some(founder_alleles) = founder_genotypes.get(founder) {{
+        if founder_alleles.len() >= 2 {{
+            founder_allele_map.insert(*allele1, founder_alleles[0]);
+            founder_allele_map.insert(*allele2, founder_alleles[1]);
+        }}
+    }}
+}}
+```
+
+For each founder the function zips their two letters
+**positionally** against the two VCF alleles in the observed
+genotype. If dad's oriented letters are `(A, B)` and his VCF
+genotype came in sorted as `[0, 1]`, the map gets `A → 0, B → 1`.
+Swap the orientation to `(B, A)` and you get `B → 0, A → 1` —
+that's how `founder_phase_orientations` exposes different
+hypotheses: the letter tuple is permuted before this call, and
+`assign_genotypes` blindly pairs position-for-position.
+
+The positional pairing is why the caller must ensure the founder
+alleles are in a consistent order — that's what
+`convert_genotype_map`'s sort does at
+[`gtg_concordance.rs:262`]({link(conc_rs, 262)}) before the
+orientation loop.
+
+The `len() >= 2` guard silently skips a founder whose VCF entry is
+shorter (e.g. hemizygous or malformed) — their letters simply
+won't appear in the map, which cascades into `UnphasedMissing` in
+step 2.
+
+### Step 2 — expand the map to every sample
+
+[`iht.rs:463-486`]({link(iht_rs, 463)}):
+
+```rust
+for (individual, (hap1, hap2))
+    in self.founders.iter().chain(self.children.iter()) {{
+    let mut allele1 = founder_allele_map.get(hap1).copied()
+        .unwrap_or(GenotypeAllele::UnphasedMissing);
+    let allele2 = founder_allele_map.get(hap2).copied()
+        .unwrap_or(GenotypeAllele::UnphasedMissing);
+
+    if *hap1 == '.' {{
+        allele1 = allele2;
+    }}
+
+    let sorted_genotypes = if allele1.index() > allele2.index() && sort_alleles {{
+        vec![allele2, allele1]
+    }} else {{
+        vec![allele1, allele2]
+    }};
+
+    updated_genotypes.insert(individual.clone(), sorted_genotypes);
+}}
+```
+
+- Iterates founders **and** kids. For founders, this round-trips
+  their observed alleles back out (`A → 0, B → 1` yields `[0, 1]`
+  for dad). For kids, their `(hap1, hap2)` letters — e.g.
+  `(A, C)` meaning "dad's first + mom's first" — are resolved
+  through the map to produce the *expected* phased genotype
+  under this orientation.
+- Letters missing from the map become `UnphasedMissing` (carried
+  through from a founder whose genotype was too short).
+- The `hap1 == '.'` branch handles the hemizygous/sentinel letter
+  convention ([`iht.rs:172`]({link(iht_rs, 172)}) onward
+  constructs `.` for hemizygous sites): treat the missing slot as
+  a copy of the other allele so the output is `[x, x]` rather
+  than `[missing, x]`.
+- When `sort_alleles` is on, alleles are reordered so the
+  lower-index one is first — that strips phase and makes the
+  output directly comparable to a sorted observed genotype. The
+  concordance loop relies on this: `compare_genotype_maps` at
+  [`gtg_concordance.rs:268`]({link(conc_rs, 268)}) does a
+  position-wise equality check, which is only meaningful if both
+  sides are in the same canonical order.
+
+### Return value
+
+```rust
+(founder_allele_map, updated_genotypes)
+```
+
+- `.0` — the letter→allele map. `find_best_phase_orientation`
+  ignores this during the search (it only wants the mismatch
+  count), which is why `main()` has to re-run `assign_genotypes`
+  on the winner at [`gtg_concordance.rs:487`]({link(conc_rs, 487)})
+  / [`:514`]({link(conc_rs, 514)}) to recover it for the output
+  VCF and debug log.
+- `.1` — expected genotypes for every sample under this
+  orientation. The search compares this against the observed map
+  at [`gtg_concordance.rs:268`]({link(conc_rs, 268)}); the
+  orientation with the fewest mismatches wins.
+
+### Net effect
+
+`assign_genotypes` is the single place where the block's abstract
+letter pedigree meets a site's concrete VCF alleles. The caller
+picks the orientation (which permutation of founder letters to
+try); `assign_genotypes` is a pure function from `(orientation,
+observed founder alleles)` to `(letter→allele map, expected
+genotypes for every sample)`. Running it once per orientation at
+a site is the inner step of the `2^F` enumeration described in
+§3.
 """
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(content)
