@@ -2852,73 +2852,18 @@ def component_3_concordance(out_dir: Path) -> None:
     _render_panel_image(body_3, c_dir / "fig3.png")
 
     # ------------------------------------------------------------------
-    # Figure 4 — truth vs deduced phased genotypes, paternal and
-    # maternal on separate rows per kid.
-    # ------------------------------------------------------------------
-    body_4 = [
-        "Figure 4 — Truth vs deduced phased genotypes",
-        "",
-        "Truth (T) vs deduced (D) phased genotypes at the two sites:",
-        "",
-    ]
-    all_pass = True
-    for s in per_site:
-        truth = s["truth"]
-        if s["best"][3] == 0:
-            dedu = s["best"][2]
-            status = "PASS -> pass.vcf"
-        else:
-            dedu = None
-            status = "FAIL -> fail.vcf"
-            all_pass = False
-        body_4.append(f"Site {s['label']}    [{status}]")
-        for kid in ["Kid1", "Kid2", "Kid3"]:
-            tp, tm = truth[kid]
-            if dedu is None:
-                dp_str = "."
-                dm_str = "."
-            else:
-                dp_str = str(dedu[kid][0])
-                dm_str = str(dedu[kid][1])
-            body_4.append(f"{kid} p   T: {tp}   D: {dp_str}")
-            body_4.append(f"{kid} m   T: {tm}   D: {dm_str}")
-        body_4.append("")
-
-    total_slots = len(NON_INFORMATIVE_SITES) * 3 * 2
-    pass_slots = sum(
-        3 * 2 for s in per_site if s["best"][3] == 0
-    )
-    mismatches = 0
-    for s in per_site:
-        if s["best"][3] != 0:
-            continue
-        dedu = s["best"][2]
-        for kid in ["Kid1", "Kid2", "Kid3"]:
-            tp, tm = s["truth"][kid]
-            dp, dm = dedu[kid]
-            if tp != dp:
-                mismatches += 1
-            if tm != dm:
-                mismatches += 1
-    body_4.append(
-        f"At PASS sites: {mismatches} phased-allele mismatches out of "
-        f"{pass_slots} slots."
-    )
-    body_4.append(
-        "FAIL sites are NOT phased — they are written as-is to fail.vcf."
-    )
-    _render_panel_image(body_4, c_dir / "fig4.png")
-
-    # ------------------------------------------------------------------
     # Markdown narrative.
     # ------------------------------------------------------------------
     _emit_component3_markdown(
         c_dir / "concordance.md",
         per_site=per_site,
-        mismatches=mismatches,
-        pass_slots=pass_slots,
-        total_slots=total_slots,
     )
+
+    # Remove the old fig4.png artifact if present (section 5 was
+    # removed, so the figure is no longer referenced).
+    old_fig4 = c_dir / "fig4.png"
+    if old_fig4.exists():
+        old_fig4.unlink()
 
     print(f"[component 3] Wrote panel PNGs + markdown to {c_dir}")
     for s in per_site:
@@ -2933,9 +2878,6 @@ def _emit_component3_markdown(
     out_path: Path,
     *,
     per_site: List[Dict],
-    mismatches: int,
-    pass_slots: int,
-    total_slots: int,
 ) -> None:
     """Write the Component-3 narrative that interleaves panel PNGs with
     prose explanations and Rust-source permalinks.
@@ -3198,31 +3140,6 @@ This is the mechanism by which `gtg-concordance` filters sequencing
 errors, Mendelian violations, and residual block-labelling mistakes
 without ever producing a phased call that the block's structural
 labels cannot justify.
-
-## 5. Truth versus deduced phased genotypes
-
-![Figure 4 — Truth vs deduced phased genotypes](fig4.png)
-
-At the PASS site (`N1`), every kid's deduced paternal and maternal
-phased alleles match the simulation truth exactly
-({mismatches} mismatches out of {pass_slots} phased-allele slots). At
-the FAIL site (`N2`), no phased output is emitted — the record lands
-in `fail.vcf` untouched and the truth row in Figure 4 is shown only to
-document what `gtg-concordance` declined to commit to.
-
-This closes the pipeline. `gtg-ped-map` (`map_builder.rs`) is a pure
-structural-labelling tool that operates on informative sites only and
-writes founder letters per individual per block.
-`gtg-concordance` (`gtg_concordance.rs`) is a pure phasing/QC tool
-that uses those structural labels to assign alleles at every site in
-the block: the passing records are phased via
-[`Iht::assign_genotypes`]({link(iht_rs, 442)}) and emitted to
-`{{prefix}}.pass.vcf` at
-[`gtg_concordance.rs:534`]({link(conc_rs, 534)}), and the failing
-records are quarantined to `{{prefix}}.fail.vcf` as described above.
-The split is the answer to "does `gtg-ped-map` reconstruct the 0/1
-allele sequence of each haplotype?": no, and deliberately — that is
-handled exclusively by `gtg-concordance`.
 
 ## Appendix: `assign_genotypes` walkthrough
 
